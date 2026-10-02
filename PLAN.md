@@ -36,7 +36,7 @@ Cas que la spec implique sans les nommer, les plus susceptibles de casser en liv
 Cocher ici **et** dans le détail de l'étape (section « Étapes d'implémentation ») une fois l'étape
 terminée et vérifiée.
 
-- [ ] 1. Scaffold Vite + TS + Phaser
+- [x] 1. Scaffold Vite + TS + Phaser
 - [ ] 2. RNG seedé + générateur de carte (pattern Classique) + tests
 - [ ] 3. Fondations des thèmes (thème de base) + scène Game : plateau, billes, bacs, scoring de base
 - [ ] 4. Rampes, tourniquets, bumpers + filet anti-blocage
