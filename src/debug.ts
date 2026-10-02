@@ -6,8 +6,9 @@ import type { Game } from './scenes/Game';
 export function setupDebug(scene: Game) {
   if (!params.debug) return;
   let clicks = 0;
+  const fake = (id: string) => ({ id, name: id, color: '#ffffff' });
   scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-    if (p.x < BOARD_W) scene.drop(`debug-${++clicks}`, p.x);
+    if (p.x < BOARD_W) scene.requestDrop(fake(`debug-${++clicks}`), p.x);
   });
 
   let bots = params.bots;
@@ -15,13 +16,8 @@ export function setupDebug(scene: Game) {
   // chaque bot relance dès que sa bille est terminée
   scene.time.addEvent({
     delay: 120, loop: true, callback: () => {
-      for (let i = 0; i < bots; i++) {
-        const id = `bot-${i}`;
-        if (!scene.hasBall(id)) {
-          scene.drop(id, Phaser.Math.Between(WALL, BOARD_W - WALL));
-          return; // un spawn par tick : évite les paquets
-        }
-      }
+      for (let i = 0; i < bots; i++)
+        if (scene.requestDrop(fake(`bot-${i}`), Phaser.Math.Between(WALL, BOARD_W - WALL))) return; // un spawn par tick
     },
   });
 

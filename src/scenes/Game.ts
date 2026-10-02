@@ -2,13 +2,14 @@ import Phaser from 'phaser';
 import {
   params, BOARD_W, HEIGHT, WALL, BALL_R, PEG_R, MAX_SPEED, RAMP_THICK, SPINNER_ARM,
   PTS_PEG, PTS_PEG_GOLDEN, PTS_BUMPER, PTS_SPINNER, HIT_COOLDOWN_MS, BUMPER_SPEED,
-  STUCK_NUDGE_MS, STUCK_KILL_MS,
+  STUCK_NUDGE_MS, STUCK_KILL_MS, PODIUM_MS,
 } from '../config';
 import { generateMap, PATTERNS, type MapData, type PatternId } from '../mapgen';
 import { applyTheme } from '../themes/apply';
 import { resolveTheme, todayMMDD } from '../themes/resolve';
 import type { Theme } from '../themes/types';
 import { setupDebug } from '../debug';
+import { GameState, type Viewer } from '../game/state';
 
 type Body = MatterJS.BodyType;
 
@@ -42,17 +43,43 @@ export class Game extends Phaser.Scene {
   private mapObjects: Phaser.GameObjects.GameObject[] = [];
   private spinners: SpinnerRt[] = [];
   private toRemove: Ball[] = [];
+  readonly state = new GameState(params.maxBalls, PODIUM_MS);
 
   constructor() { super({ key: 'Game', active: true }); }
 
   async create() {
+    this.game.registry.set('state', this.state);
     this.buildFrame();
-    this.theme = resolveTheme(todayMMDD(params.date), params.theme);
-    await applyTheme(this, this.theme);
-    this.game.events.emit('theme', this.theme);
-    this.buildMap(generateMap(params.seed ?? Math.floor(Math.random() * 1e9), patternParam()));
     this.matter.world.on('collisionstart', this.onCollision, this);
     setupDebug(this);
+    await this.newGame(params.seed ?? undefined);
+  }
+
+  /** Nouvelle partie : billes et carte détruites AVANT un éventuel changement de textures. */
+  async newGame(seed = Math.floor(Math.random() * 1e9)) {
+    this.map = undefined; // suspend update() pendant la transition
+    for (const ball of [...this.balls.values()]) this.removeBall(ball);
+    this.toRemove.length = 0;
+    this.clearMap();
+    const theme = resolveTheme(todayMMDD(params.date), params.theme);
+    if (theme.id !== this.theme?.id) {
+      this.theme = theme;
+      await applyTheme(this, theme);
+      this.game.registry.set('theme', theme);
+      this.game.events.emit('theme', theme);
+    }
+    this.buildMap(generateMap(seed, patternParam()));
+    this.state.start(Date.now(), params.duration * 60_000);
+    this.game.events.emit('phase', 'playing');
+  }
+
+  private clearMap() {
+    for (const o of this.mapObjects) o.destroy();
+    for (const b of this.mapBodies) this.matter.world.remove(b);
+    this.mapObjects = [];
+    this.mapBodies = [];
+    this.spinners = [];
+    this.els.clear();
   }
 
   /** Murs, plafond et sol permanents. */
@@ -120,9 +147,17 @@ export class Game extends Phaser.Scene {
   private staticBody(b: Body) { this.mapBodies.push(b); return b; }
   private track<T extends Phaser.GameObjects.GameObject>(o: T) { this.mapObjects.push(o); return o; }
 
+  /** Point d'entrée unique des drops (tchat, Heat, debug). Refusé si bille déjà active, plafond atteint ou podium. */
+  requestDrop(viewer: Viewer, x: number): boolean {
+    if (!this.map || !this.state.canDrop(viewer.id)) return false;
+    this.state.ballStarted(viewer);
+    this.drop(viewer.id, x);
+    this.game.events.emit('drop', viewer);
+    return true;
+  }
+
   /** Lâche une bille en x (coordonnée plateau). */
-  drop(userId: string, x: number): Ball | null {
-    if (!this.map) return null;
+  private drop(userId: string, x: number): Ball {
     const bx = Phaser.Math.Clamp(x, WALL + BALL_R + 2, BOARD_W - WALL - BALL_R - 2);
     const y = BALL_R + 24;
     const body = this.matter.add.circle(bx, y, BALL_R, {
@@ -135,11 +170,6 @@ export class Game extends Phaser.Scene {
     };
     this.balls.set(body.id, ball);
     return ball;
-  }
-
-  hasBall(userId: string) {
-    for (const b of this.balls.values()) if (b.userId === userId) return true;
-    return false;
   }
 
   get ballCount() { return this.balls.size; }
@@ -195,6 +225,7 @@ export class Game extends Phaser.Scene {
   }
 
   private score(ball: Ball, points: number, x: number, y: number) {
+    this.state.addScore(ball.userId, points, Date.now());
     this.game.events.emit('score', ball.userId, points, x, y);
     // ponytail: pop-up provisoire non poolé, remplacé par le pool BitmapText à l'étape 8
     const t = this.add.text(x, y - 10, `+${points}`, {
@@ -203,15 +234,23 @@ export class Game extends Phaser.Scene {
     this.tweens.add({ targets: t, y: y - 50, alpha: 0, duration: 700, onComplete: () => t.destroy() });
   }
 
+  /** Seul chemin de fin de bille (bac, anti-blocage, reset) : libère toujours le viewer. */
   private removeBall(ball: Ball) {
+    if (!this.balls.delete(ball.body.id)) return;
     this.matter.world.remove(ball.body);
     ball.img.destroy();
-    this.balls.delete(ball.body.id);
+    this.state.ballFinished(ball.userId);
     this.game.events.emit('ballFinished', ball.userId);
   }
 
   update(_time: number, delta: number) {
     if (!this.map) return;
+    const transition = this.state.tick(Date.now());
+    if (transition === 'podium') this.game.events.emit('phase', 'podium');
+    if (transition === 'next') {
+      void this.newGame();
+      return;
+    }
     // deux sous-pas par frame : une bille rapide ne traverse pas un obstacle fin
     const dt = Math.min(delta, 33.3) / 2; // Matter recommande ≤ 16.67 ms par pas
     for (let i = 0; i < 2; i++) {

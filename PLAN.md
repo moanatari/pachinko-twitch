@@ -40,7 +40,7 @@ terminée et vérifiée.
 - [x] 2. RNG seedé + générateur de carte (pattern Classique) + tests
 - [x] 3. Fondations des thèmes (thème de base) + scène Game : plateau, billes, bacs, scoring de base
 - [x] 4. Rampes, tourniquets, bumpers + filet anti-blocage
-- [ ] 5. État de partie + HUD (timer, classement, podium, cycle)
+- [x] 5. État de partie + HUD (timer, classement, podium, cycle)
 - [ ] 6. Tchat IRC + Heat
 - [ ] 7. Utilisateurs et avatars
 - [ ] 8. Juice + direction artistique de base (marquee, pop-ups, particules, glow, shake, animations)
@@ -424,17 +424,17 @@ points et les bacs détruisent les billes avec le bon score.
 plus de 8 s sur 5 minutes de spam.
 
 ### 5. État de partie + HUD (timer, classement, podium, cycle)
-- [ ] `game/state.ts` : `players`, `activeBall`, `phase`, `endsAt`, méthodes `canDrop(userId)`,
+- [x] `game/state.ts` : `players`, `activeBall`, `phase`, `endsAt`, méthodes `canDrop(userId)`,
       `addScore(userId, pts)`, `top(n)`, `reset()`.
-- [ ] Drop refusé si bille déjà active pour ce user ou si `maxBalls` atteint.
-- [ ] Événements via `game.events` : `drop`, `score`, `ballFinished`, `phase`.
-- [ ] Scène Hud : timer `mm:ss`, top 10 (nom + score), nombre de joueurs.
-- [ ] Cycle : `playing` → fin du timer → `podium` (drops refusés, billes restantes finissent et
+- [x] Drop refusé si bille déjà active pour ce user ou si `maxBalls` atteint.
+- [x] Événements via `game.events` : `drop`, `score`, `ballFinished`, `phase`.
+- [x] Scène Hud : timer `mm:ss`, top 10 (nom + score), nombre de joueurs.
+- [x] Cycle : `playing` → fin du timer → `podium` (drops refusés, billes restantes finissent et
       comptent) → ~15 s → suppression des billes, nouvelle seed, nouvelle carte, scores remis à zéro
       → `playing`.
-- [ ] Podium : top 3 affiché par-dessus le plateau, titre = `theme.texts.podiumTitle`
+- [x] Podium : top 3 affiché par-dessus le plateau, titre = `theme.texts.podiumTitle`
       (lu par le Hud via un registre `game.registry.set('theme', theme)`, pas d'import de thème).
-- [ ] Nouvelle partie : `resolveTheme(todayMMDD(params.date), params.theme)` ; si l'`id` diffère du
+- [x] Nouvelle partie : `resolveTheme(todayMMDD(params.date), params.theme)` ; si l'`id` diffère du
       thème courant → **d'abord** détruire billes et objets de la carte, **puis** `await applyTheme`,
       puis construire la nouvelle carte.
 
@@ -447,7 +447,7 @@ plus de 8 s sur 5 minutes de spam.
 - Libérer `activeBall` dans **tous** les cas de fin de bille (bac, anti-blocage, reset de partie),
   sinon un viewer reste bloqué sans pouvoir relancer.
 
-- [ ] **Vérif (étape terminée)** : partie de 1 min en debug (`?duration=1`) : timer, classement live, podium, nouvelle carte.
+- [x] **Vérif (étape terminée)** : partie de 1 min en debug (`?duration=1`) : timer, classement live, podium, nouvelle carte.
 
 ### 6. Tchat IRC + Heat
 - [ ] `twitch/chat.ts` : connexion WebSocket, `CAP REQ`, `PASS`/`NICK justinfan<n>`, `JOIN`.
