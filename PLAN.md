@@ -39,7 +39,7 @@ terminée et vérifiée.
 - [x] 1. Scaffold Vite + TS + Phaser
 - [x] 2. RNG seedé + générateur de carte (pattern Classique) + tests
 - [x] 3. Fondations des thèmes (thème de base) + scène Game : plateau, billes, bacs, scoring de base
-- [ ] 4. Rampes, tourniquets, bumpers + filet anti-blocage
+- [x] 4. Rampes, tourniquets, bumpers + filet anti-blocage
 - [ ] 5. État de partie + HUD (timer, classement, podium, cycle)
 - [ ] 6. Tchat IRC + Heat
 - [ ] 7. Utilisateurs et avatars
@@ -403,14 +403,14 @@ a le rendu laiton/laque du thème de base, des clics font tomber des billes, les
 points et les bacs détruisent les billes avec le bon score.
 
 ### 4. Rampes, tourniquets, bumpers + filet anti-blocage
-- [ ] Rampes : rectangles statiques inclinés (`angle`), friction quasi nulle, pas de points.
-- [ ] Tourniquets : corps statique composé (croix ou barre), rotation par `Body.setAngle(body, a, true)`
+- [x] Rampes : rectangles statiques inclinés (`angle`), friction quasi nulle, pas de points.
+- [x] Tourniquets : corps statique composé (croix ou barre), rotation par `Body.setAngle(body, a, true)`
       à chaque step (le `true` met à jour la vitesse pour transmettre l'élan), +3 au contact.
-- [ ] Bumpers : cercle statique, au contact on impose à la bille une vitesse le long de la normale
+- [x] Bumpers : cercle statique, au contact on impose à la bille une vitesse le long de la normale
       avec biais vers le haut, clampée ; +5.
-- [ ] Filet anti-blocage : vitesse < seuil pendant 3 s → impulsion aléatoire ; 8 s → bille retirée
+- [x] Filet anti-blocage : vitesse < seuil pendant 3 s → impulsion aléatoire ; 8 s → bille retirée
       sans points de bac.
-- [ ] Toutes les constantes (forces, vitesses de rotation, seuils) dans `config.ts`.
+- [x] Toutes les constantes (forces, vitesses de rotation, seuils) dans `config.ts`.
 
 ⚠️ Vigilance
 - Vérifier que la version de Matter embarquée accepte le 3ᵉ argument `updateVelocity` de `setAngle`.
@@ -420,7 +420,7 @@ points et les bacs détruisent les billes avec le bon score.
 - Le cooldown de score s'applique aussi aux bumpers et tourniquets (une bille coincée contre un
   tourniquet ne doit pas farmer des points).
 
-- [ ] **Vérif (étape terminée)** : en debug, chaque élément dévie les billes comme prévu ; aucune bille ne reste bloquée
+- [x] **Vérif (étape terminée)** : en debug, chaque élément dévie les billes comme prévu ; aucune bille ne reste bloquée
 plus de 8 s sur 5 minutes de spam.
 
 ### 5. État de partie + HUD (timer, classement, podium, cycle)

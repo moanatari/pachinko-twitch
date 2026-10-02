@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import {
-  params, BOARD_W, HEIGHT, WALL, BALL_R, PEG_R, MAX_SPEED,
-  PTS_PEG, PTS_PEG_GOLDEN, HIT_COOLDOWN_MS,
+  params, BOARD_W, HEIGHT, WALL, BALL_R, PEG_R, MAX_SPEED, RAMP_THICK, SPINNER_ARM,
+  PTS_PEG, PTS_PEG_GOLDEN, PTS_BUMPER, PTS_SPINNER, HIT_COOLDOWN_MS, BUMPER_SPEED,
+  STUCK_NUDGE_MS, STUCK_KILL_MS,
 } from '../config';
 import { generateMap, PATTERNS, type MapData, type PatternId } from '../mapgen';
 import { applyTheme } from '../themes/apply';
@@ -17,13 +18,17 @@ interface Ball {
   img: Phaser.GameObjects.Image;
   done: boolean; // a touché un bac : ignorer toute collision suivante
   hits: Map<number, number>; // id d'obstacle → dernier score (cooldown)
+  anchor: { x: number; y: number; t: number }; // dernière position « éloignée » (anti-blocage)
+  lastNudge: number;
 }
 
 interface El {
-  kind: 'peg' | 'bin';
+  kind: 'peg' | 'bin' | 'bumper' | 'spinner';
   points: number;
   img?: Phaser.GameObjects.Image;
 }
+
+interface SpinnerRt { body: Body; img: Phaser.GameObjects.Image; speed: number }
 
 const DIVIDER = 6;
 const hex = (c: string) => Phaser.Display.Color.HexStringToColor(c).color;
@@ -35,6 +40,7 @@ export class Game extends Phaser.Scene {
   private els = new Map<number, El>(); // id du body → obstacle
   private mapBodies: Body[] = [];
   private mapObjects: Phaser.GameObjects.GameObject[] = [];
+  private spinners: SpinnerRt[] = [];
   private toRemove: Ball[] = [];
 
   constructor() { super({ key: 'Game', active: true }); }
@@ -66,6 +72,30 @@ export class Game extends Phaser.Scene {
       const body = this.staticBody(this.matter.add.circle(p.x, p.y, PEG_R, { isStatic: true, label: 'peg' }));
       const img = this.track(this.add.image(p.x, p.y, p.golden ? 'pegGolden' : 'peg').setDisplaySize(PEG_R * 2, PEG_R * 2));
       this.els.set(body.id, { kind: 'peg', points: p.golden ? PTS_PEG_GOLDEN : PTS_PEG, img });
+    }
+
+    for (const r of map.ramps) {
+      this.staticBody(this.matter.add.rectangle(r.x, r.y, r.length, RAMP_THICK,
+        { isStatic: true, angle: r.angle, friction: 0, label: 'ramp' }));
+      this.track(this.add.image(r.x, r.y, 'ramp').setDisplaySize(r.length, RAMP_THICK).setRotation(r.angle));
+    }
+
+    for (const b of map.bumpers) {
+      const body = this.staticBody(this.matter.add.circle(b.x, b.y, b.radius, { isStatic: true, label: 'bumper' }));
+      const img = this.track(this.add.image(b.x, b.y, 'bumper').setDisplaySize(b.radius * 2, b.radius * 2));
+      this.els.set(body.id, { kind: 'bumper', points: PTS_BUMPER, img });
+    }
+
+    for (const s of map.spinners) {
+      // croix : deux barres fusionnées en un corps composé statique, tourné à chaque pas
+      const parts = [0, Math.PI / 2].map((angle) =>
+        this.matter.bodies.rectangle(s.x, s.y, s.radius * 2, SPINNER_ARM, { angle, chamfer: { radius: SPINNER_ARM / 2 } }));
+      const body = this.matter.body.create({ parts, isStatic: true, label: 'spinner' });
+      this.matter.world.add(body);
+      this.staticBody(body);
+      const img = this.track(this.add.image(s.x, s.y, 'spinner').setDisplaySize(s.radius * 2, s.radius * 2));
+      this.spinners.push({ body, img, speed: s.speed });
+      this.els.set(body.id, { kind: 'spinner', points: PTS_SPINNER, img });
     }
 
     const g = this.track(this.add.graphics());
@@ -100,7 +130,9 @@ export class Game extends Phaser.Scene {
     });
     this.matter.body.setVelocity(body, { x: Phaser.Math.FloatBetween(-0.6, 0.6), y: 0 });
     const img = this.add.image(bx, y, 'ball').setDisplaySize(BALL_R * 2, BALL_R * 2);
-    const ball: Ball = { userId, body, img, done: false, hits: new Map() };
+    const ball: Ball = {
+      userId, body, img, done: false, hits: new Map(), anchor: { x: bx, y, t: this.time.now }, lastNudge: 0,
+    };
     this.balls.set(body.id, ball);
     return ball;
   }
@@ -127,10 +159,38 @@ export class Game extends Phaser.Scene {
         this.toRemove.push(ball);
         continue;
       }
+      if (el.kind === 'bumper') this.bounce(ball, other);
       const last = ball.hits.get(other.id) ?? -Infinity;
       if (this.time.now - last < HIT_COOLDOWN_MS) continue;
       ball.hits.set(other.id, this.time.now);
       this.score(ball, el.points, x, y);
+    }
+  }
+
+  /** Bumper : vitesse imposée le long de la normale, biaisée vers le haut. */
+  private bounce(ball: Ball, bumper: Body) {
+    let nx = ball.body.position.x - bumper.position.x;
+    let ny = ball.body.position.y - bumper.position.y - 0.6 * Math.hypot(nx, ball.body.position.y - bumper.position.y);
+    const len = Math.hypot(nx, ny) || 1;
+    nx /= len;
+    ny /= len;
+    this.matter.body.setVelocity(ball.body, { x: nx * BUMPER_SPEED, y: ny * BUMPER_SPEED });
+  }
+
+  /** Bille qui ne s'éloigne pas de 2 rayons : coup de pouce à 3 s, retirée sans points à 8 s. */
+  private unstick(ball: Ball, now: number) {
+    const { x, y } = ball.body.position;
+    if (Math.hypot(x - ball.anchor.x, y - ball.anchor.y) > BALL_R * 2) {
+      ball.anchor = { x, y, t: now };
+      return;
+    }
+    const idle = now - ball.anchor.t;
+    if (idle > STUCK_KILL_MS) {
+      ball.done = true;
+      this.toRemove.push(ball);
+    } else if (idle > STUCK_NUDGE_MS && now - ball.lastNudge > 1000) {
+      ball.lastNudge = now;
+      this.matter.body.setVelocity(ball.body, { x: Phaser.Math.FloatBetween(-3, 3), y: -3 });
     }
   }
 
@@ -154,9 +214,15 @@ export class Game extends Phaser.Scene {
     if (!this.map) return;
     // deux sous-pas par frame : une bille rapide ne traverse pas un obstacle fin
     const dt = Math.min(delta, 33.3) / 2; // Matter recommande ≤ 16.67 ms par pas
-    this.matter.world.step(dt);
-    this.matter.world.step(dt);
+    for (let i = 0; i < 2; i++) {
+      // setAngle(..., true) met à jour anglePrev : le solveur transmet l'élan du tourniquet
+      for (const s of this.spinners) this.matter.body.setAngle(s.body, s.body.angle + (s.speed * dt) / 16.667, true);
+      this.matter.world.step(dt);
+    }
+    for (const s of this.spinners) s.img.setRotation(s.body.angle);
+    const now = this.time.now;
     for (const ball of this.balls.values()) {
+      if (!ball.done) this.unstick(ball, now);
       const v = ball.body.velocity;
       const speed = Math.hypot(v.x, v.y);
       if (speed > MAX_SPEED) this.matter.body.setVelocity(ball.body, { x: (v.x / speed) * MAX_SPEED, y: (v.y / speed) * MAX_SPEED });
