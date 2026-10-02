@@ -3,8 +3,9 @@ import { WIDTH, HEIGHT } from './config';
 import { Backdrop } from './scenes/Backdrop';
 import { Game } from './scenes/Game';
 import { Hud } from './scenes/Hud';
+import { createMenu } from './ui/menu';
 
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.WEBGL,
   width: WIDTH,
   height: HEIGHT,
@@ -17,3 +18,5 @@ new Phaser.Game({
   },
   scene: [Backdrop, Game, Hud],
 });
+
+createMenu(game);

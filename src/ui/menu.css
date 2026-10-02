@@ -1,0 +1,61 @@
+/* Menu du streamer : calque 1920×1080 aligné sur le canvas (mis à l'échelle par menu.ts). */
+.menu-root {
+  --accent: #e8c15a; --frame: #b8892f; --text: #f3ead7; --bg: #140d10;
+  position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; z-index: 10;
+  transform-origin: 0 0; pointer-events: none;
+  font: 22px/1.4 "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: var(--text);
+}
+.menu-root button {
+  font: inherit; color: var(--text); cursor: pointer; padding: 8px 18px;
+  background: color-mix(in srgb, var(--bg) 70%, var(--frame)); border: 2px solid var(--frame); border-radius: 8px;
+}
+.menu-root button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.menu-root button:disabled { opacity: 0.4; cursor: default; }
+.menu-root button.danger { border-color: #c0392b; }
+.menu-gear {
+  position: absolute; right: 16px; bottom: 16px; width: 52px; height: 52px;
+  pointer-events: auto; opacity: 0.35; padding: 0 !important; font-size: 28px !important;
+}
+.menu-gear:hover { opacity: 1; }
+.menu-backdrop {
+  position: absolute; inset: 0; pointer-events: auto; background: rgba(0, 0, 0, 0.45);
+  display: flex; align-items: center; justify-content: center;
+}
+.menu-backdrop[hidden] { display: none; }
+.menu-panel {
+  width: 1000px; height: 720px; box-sizing: border-box; padding: 24px 32px; display: flex; flex-direction: column;
+  background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(6px);
+  border: 3px solid var(--frame); border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--accent) inset, 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+.menu-tabs { display: flex; gap: 12px; margin-bottom: 20px; }
+.menu-tabs button { font-family: "Dela Gothic One", sans-serif; font-size: 24px; }
+.menu-tabs button.active { background: var(--frame); color: var(--bg); }
+.menu-body { flex: 1; overflow-y: auto; }
+.menu-root h3 { font-family: "Dela Gothic One", sans-serif; font-weight: normal; color: var(--accent); margin: 24px 0 10px; }
+.menu-info { display: grid; grid-template-columns: max-content 1fr; gap: 6px 24px; margin: 0 0 24px; }
+.menu-info dt { color: var(--accent); }
+.menu-info dd { margin: 0; }
+.menu-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.menu-hint, .menu-empty, .menu-root small { opacity: 0.65; }
+.menu-notice { color: var(--accent); font-weight: bold; min-height: 1.4em; margin: 0 0 12px; }
+.menu-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 28px; }
+.menu-form label { display: flex; flex-direction: column; gap: 6px; }
+.menu-form label.menu-check { flex-direction: row; align-items: center; gap: 10px; }
+.menu-root input, .menu-root select {
+  font: inherit; color: var(--text); background: rgba(0, 0, 0, 0.35);
+  border: 2px solid var(--frame); border-radius: 6px; padding: 6px 10px;
+}
+.menu-root input[type="checkbox"] { width: 24px; height: 24px; accent-color: var(--accent); }
+.menu-search { width: 100%; box-sizing: border-box; margin-bottom: 12px; }
+.menu-table { width: 100%; border-collapse: collapse; }
+.menu-table th { text-align: left; color: var(--accent); font-weight: normal; }
+.menu-table td, .menu-table th { padding: 6px 8px; border-bottom: 1px solid color-mix(in srgb, var(--frame) 40%, transparent); }
+.menu-row-actions { white-space: nowrap; text-align: right; }
+.menu-row-actions button { padding: 4px 10px; font-size: 18px; }
+.menu-avatar { display: inline-block; width: 36px; height: 36px; border-radius: 50%; vertical-align: middle; object-fit: cover; }
+.menu-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 8px #3ddc84; }
+.menu-history, .menu-bans { list-style: none; margin: 0 0 16px; padding: 0; }
+.menu-history li, .menu-bans li { padding: 12px 0; border-bottom: 1px solid color-mix(in srgb, var(--frame) 40%, transparent); }
+.menu-top3 { margin: 4px 0 8px; opacity: 0.85; }
+body.cursor-hidden, body.cursor-hidden * { cursor: none !important; }
