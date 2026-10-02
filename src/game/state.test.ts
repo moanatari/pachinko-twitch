@@ -119,3 +119,100 @@ describe('GameState — cycle', () => {
     expect(s.phase).toBe('playing');
   });
 });
+
+describe('GameState — pause', () => {
+  it('gèle le timer, refuse les drops, bloque les transitions', () => {
+    const s = started();
+    s.pause(10_000);
+    expect(s.paused).toBe(true);
+    expect(s.remainingMs(40_000)).toBe(50_000);
+    expect(s.canDrop('a')).toBe(false);
+    expect(s.tick(70_000)).toBe(null);
+    s.resume(40_000);
+    expect(s.paused).toBe(false);
+    expect(s.remainingMs(40_000)).toBe(50_000);
+    expect(s.canDrop('a')).toBe(true);
+    expect(s.tick(89_999)).toBe(null);
+    expect(s.tick(90_000)).toBe('podium');
+  });
+
+  it('pause pendant le podium : fin du podium décalée', () => {
+    const s = started();
+    expect(s.tick(60_000)).toBe('podium'); // podium jusqu'à 75 000
+    s.pause(70_000);
+    expect(s.tick(80_000)).toBe(null);
+    s.resume(90_000);
+    expect(s.tick(94_999)).toBe(null);
+    expect(s.tick(95_000)).toBe('next');
+  });
+
+  it('pause idempotente, reprise sans pause sans effet', () => {
+    const s = started();
+    s.resume(5_000);
+    expect(s.remainingMs(5_000)).toBe(55_000);
+    s.pause(10_000);
+    s.pause(20_000);
+    s.resume(30_000);
+    expect(s.remainingMs(30_000)).toBe(50_000);
+  });
+
+  it('la durée jouée exclut la pause', () => {
+    const s = started();
+    s.pause(10_000);
+    s.resume(30_000);
+    expect(s.endsAt - s.startedAt).toBe(60_000);
+  });
+
+  it('start() lève la pause', () => {
+    const s = started();
+    s.pause(10_000);
+    s.start(20_000, 60_000);
+    expect(s.paused).toBe(false);
+    expect(s.canDrop('a')).toBe(true);
+  });
+});
+
+describe('GameState — joueurs et modération', () => {
+  it('compte les billes jouées', () => {
+    const s = started();
+    s.ballStarted(alice);
+    s.ballFinished('a');
+    s.ballStarted(alice);
+    expect(s.players.get('a')!.balls).toBe(2);
+  });
+
+  it('hasBall suit la bille active', () => {
+    const s = started();
+    s.ballStarted(alice);
+    expect(s.hasBall('a')).toBe(true);
+    s.ballFinished('a');
+    expect(s.hasBall('a')).toBe(false);
+  });
+
+  it('resetScore() remet à zéro sans retirer le joueur, ignore les inconnus', () => {
+    const s = started();
+    s.ballStarted(alice);
+    s.addScore('a', 50, 10);
+    s.resetScore('a');
+    s.resetScore('zzz');
+    expect(s.players.get('a')!.score).toBe(0);
+    expect(s.players.size).toBe(1);
+  });
+
+  it('remove() retire le joueur et sa bille active', () => {
+    const s = started();
+    s.ballStarted(alice);
+    s.ballStarted(bob);
+    s.remove('a');
+    expect(s.players.has('a')).toBe(false);
+    expect(s.hasBall('a')).toBe(false);
+    expect(s.top(10).map((p) => p.id)).toEqual(['b']);
+  });
+
+  it('maxBalls modifiable à chaud', () => {
+    const s = started(10);
+    s.ballStarted(alice);
+    s.maxBalls = 1;
+    expect(s.canDrop('b')).toBe(false);
+  });
+});
