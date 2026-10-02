@@ -4,17 +4,22 @@ import { parseParams } from './config';
 describe('parseParams', () => {
   it('valeurs par défaut', () => {
     expect(parseParams('')).toEqual({
-      channel: null, duration: 5, maxBalls: 150, seed: null, shake: true,
-      debug: false, bots: 0, theme: null, date: null, pattern: null,
+      channel: null, duration: 5, maxBalls: 150, seed: null, shake: true, autoNext: true,
+      debug: false, bots: 0, theme: 'auto', date: null, pattern: null,
     });
   });
 
   it('lit les paramètres', () => {
     const p = parseParams('?channel=MaChaine&duration=3&maxBalls=80&seed=42&shake=0&debug=1&bots=20&theme=noel&date=2026-12-15&pattern=trous');
     expect(p).toEqual({
-      channel: 'machaine', duration: 3, maxBalls: 80, seed: 42, shake: false,
+      channel: 'machaine', duration: 3, maxBalls: 80, seed: 42, shake: false, autoNext: true,
       debug: true, bots: 20, theme: 'noel', date: '2026-12-15', pattern: 'trous',
     });
+  });
+
+  it("l'URL prime sur les réglages sauvegardés", () => {
+    const p = parseParams('?duration=3', { channel: 'machaine', duration: 10, maxBalls: 80 });
+    expect(p).toMatchObject({ channel: 'machaine', duration: 3, maxBalls: 80 });
   });
 
   it('borne les valeurs numériques', () => {

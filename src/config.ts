@@ -1,34 +1,25 @@
-export interface Params {
-  channel: string | null;
-  duration: number; // minutes
-  maxBalls: number;
+import { mergeSettings, loadSettings, clampInt, DEFAULT_SETTINGS, type Settings } from './settings';
+import { safeStorage } from './storage';
+
+/** Réglages (menu, sauvegardés, surchargés par l'URL) + paramètres d'URL réservés au dev.
+ *  Objet MUTABLE : `Game.applySettings` le met à jour à chaud, le code le relit à chaque usage. */
+export interface Params extends Settings {
   seed: number | null;
-  shake: boolean;
   debug: boolean;
   bots: number;
-  theme: string | null;
   date: string | null;
   pattern: string | null;
 }
 
-const clampInt = (raw: string | null, def: number, min: number, max: number) => {
-  const n = raw === null ? NaN : parseInt(raw, 10);
-  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
-};
-
-export function parseParams(search: string): Params {
+export function parseParams(search: string, saved: unknown = DEFAULT_SETTINGS): Params {
   const q = new URLSearchParams(search);
   const debug = q.get('debug') === '1';
   const seed = parseInt(q.get('seed') ?? '', 10);
   return {
-    channel: q.get('channel')?.trim().toLowerCase() || null,
-    duration: clampInt(q.get('duration'), 5, 1, 60),
-    maxBalls: clampInt(q.get('maxBalls'), 150, 1, 500),
+    ...mergeSettings(DEFAULT_SETTINGS, saved, search),
     seed: Number.isFinite(seed) ? seed : null,
-    shake: q.get('shake') !== '0',
     debug,
     bots: debug ? clampInt(q.get('bots'), 0, 0, 500) : 0,
-    theme: q.get('theme') || null,
     date: q.get('date') || null,
     pattern: q.get('pattern') || null,
   };
@@ -72,4 +63,4 @@ export const STUCK_KILL_MS = 8000;
 // --- Partie ---
 export const PODIUM_MS = 15000;
 
-export const params = parseParams(typeof location === 'undefined' ? '' : location.search);
+export const params = parseParams(typeof location === 'undefined' ? '' : location.search, loadSettings(safeStorage()));

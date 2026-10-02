@@ -105,7 +105,7 @@ export class Game extends Phaser.Scene {
     for (const ball of [...this.balls.values()]) this.removeBall(ball);
     this.toRemove.length = 0;
     this.clearMap();
-    const theme = resolveTheme(todayMMDD(params.date), this.forcedTheme ?? params.theme);
+    const theme = resolveTheme(todayMMDD(params.date), this.forcedTheme ?? (params.theme === 'auto' ? null : params.theme));
     if (theme.id !== this.theme?.id) {
       // tout ce qui affiche une texture du thème disparaît AVANT que les textures soient remplacées
       this.game.events.emit('theme-unload');

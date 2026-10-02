@@ -1,9 +1,9 @@
 // Annuaire des viewers : id Twitch → nom + avatar, via l'API publique de Heat (sans token).
 // Pur : aucune dépendance Phaser (les textures d'avatar sont dans avatars.ts).
+import { safeStorage, type KV } from '../storage';
 
 export interface RemoteUser { display_name: string; profile_image_url: string }
 export interface UserInfo { name: string; avatar: string | null; at: number }
-type KV = Pick<Storage, 'getItem' | 'setItem'>;
 
 const TTL = 7 * 86_400_000;
 const STORAGE_KEY = 'pachinko-users';
@@ -76,13 +76,5 @@ async function fetchHeatUser(id: string): Promise<RemoteUser | null> {
   const res = await fetch(`https://heat-api.j38.net/user/${id}`);
   return res.ok ? ((await res.json()) as RemoteUser) : null;
 }
-
-const safeStorage = (): KV | null => {
-  try {
-    return typeof localStorage === 'undefined' ? null : localStorage;
-  } catch {
-    return null;
-  }
-};
 
 export const users = new UserDirectory(fetchHeatUser, safeStorage());
