@@ -1,7 +1,8 @@
 # Pachinko Twitch
 
-Jeu de pachinko 2D en navigateur, chargé comme source OBS, contrôlé par les viewers Twitch
-(clic via l'extension Heat, ou `!drop` dans le tchat). Voir PLAN.md pour le design complet.
+Jeu de pachinko 2D lancé en plein écran dans le navigateur (fenêtre capturée par OBS), joué par le streamer
+à la souris et par les viewers Twitch (clic via l'extension Heat, ou `!drop` dans le tchat). Voir PLAN.md
+pour le design complet et `docs/superpowers/specs/2026-10-02-streamer-mode-design.md` pour le mode streamer.
 
 ## Suivi
 PLAN.md contient la checklist des étapes (« Avancement » en haut, détail dans « Étapes d'implémentation »).
@@ -13,13 +14,18 @@ Vite + TypeScript + Phaser 3.90 (WebGL) avec Matter.js intégré. vitest pour le
 Aucun backend, aucun token Twitch.
 
 ## Commandes
-- `npm run dev` — serveur de dev (ouvrir `/?debug=1` pour jouer à la souris, touche B = bots)
-- `npm run build` / `npm run preview` — build statique pour OBS
-- `npm run test` — vitest (mapgen, parse IRC)
+- `npm run dev` — serveur de dev (clic = bille du streamer, Échap = menu ; `/?debug=1` : touche B = bots, T = thème)
+- `npm run build` / `npm run preview` — build statique
+- `npm run test` — vitest (mapgen, réglages, état, bans, historique, parse IRC)
+- `npm run verify` — vérification navigateur du mode streamer (Playwright sur le Chrome installé, dev server lancé)
 
 ## Architecture
 - `src/mapgen.ts` : génération procédurale **pure** (seed → éléments). Ne jamais importer Phaser ici.
-- `src/game/state.ts` : source de vérité joueurs/scores/billes actives/phase.
+- `src/game/state.ts` : source de vérité joueurs/scores/billes actives/phase/pause.
+- `src/settings.ts` + `src/storage.ts` : réglages persistants (URL > sauvegardé > défaut), localStorage tolérant.
+  `params` (config.ts) est le résultat mutable de cette fusion. `src/game/bans.ts`, `src/game/history.ts` : purs, persistants.
+- `src/ui/` : menu DOM du streamer ; n'appelle que l'API publique de `Game` (`admin`, `replay`, `moderate`,
+  `applySettings`) et lit l'état, jamais les scènes.
 - `src/scenes/Game.ts` : physique + rendu du plateau + juice ; `src/scenes/Hud.ts` : timer, classement, podium.
 - `src/twitch/` : `chat.ts` (IRC WebSocket anonyme), `heat.ts` (WebSocket Heat), `users.ts` (lookup + avatars).
 - Communication via `game.events` (Phaser EventEmitter), pas de bus maison.

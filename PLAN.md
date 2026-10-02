@@ -47,6 +47,7 @@ terminée et vérifiée.
 - [x] 9. Thèmes saisonniers (Halloween, Hiver, Noël, Sakura, Plage)
 - [x] 10. Les 4 autres patterns de génération
 - [ ] 11. Passe perf et réglages finaux
+- [x] 12. Mode streamer : plein écran, menus, modération, historique (spec `docs/superpowers/specs/2026-10-02-streamer-mode-design.md`, plan `docs/superpowers/plans/2026-10-02-streamer-mode.md`)
 
 ## Décisions prises
 | Sujet | Choix |
@@ -623,6 +624,17 @@ ni hausse continue de la mémoire (onglet Memory de Chrome).
   lancers ; surveiller le ratio points taquets / points bacs.
 
 - [ ] **Vérif (étape terminée)** : 60 fps stables à 150 billes dans OBS ; une partie réelle de bout en bout sans bug.
+
+### 12. Mode streamer
+- [x] Réglages persistants (défauts < sauvegardés < URL), application à chaud (`Game.applySettings`).
+- [x] Contrôle de partie : pause/reprise, terminer, carte suivante, rejouer, démarrer (menu + `!pachinko pause|resume|end|skip|start`, `stop` = alias de `pause`).
+- [x] Le streamer joue à la souris (id = room-id de sa chaîne, `streamer` sans chaîne).
+- [x] Joueurs (classement complet, retirer la bille, score à zéro, exclure), bans et historique persistants.
+- [x] Menu DOM (Échap / roue crantée), plein écran, curseur masqué après 3 s.
+- [x] **Vérif** : `npm run verify` (Playwright headless sur le Chrome installé, 2026-10-02) — 20/20 OK :
+      premier lancement → Réglages, chaîne persistée, pause 9 s (timer gelé, bille conservée), exclusion,
+      historique après une partie de 1 min, 60 fps menu fermé / 60 fps menu ouvert à 145 billes.
+      À vérifier à la main : Échap en plein écran (verrou clavier Chrome ; Firefox : préférer F11).
 
 ## Vérification
 - `npm run test` : `mapgen.test.ts` (1000 seeds × 5 patterns respectent les règles),
