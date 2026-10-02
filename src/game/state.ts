@@ -33,6 +33,12 @@ export class GameState {
 
   ballFinished(userId: string) { this.active.delete(userId); }
 
+  /** Nom résolu après coup (lookup réseau d'un viewer venu de Heat). */
+  rename(userId: string, name: string) {
+    const p = this.players.get(userId);
+    if (p) p.name = name;
+  }
+
   addScore(userId: string, points: number, now: number) {
     const p = this.players.get(userId);
     if (!p) return;

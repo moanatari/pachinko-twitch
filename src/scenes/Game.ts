@@ -11,6 +11,8 @@ import type { Theme } from '../themes/types';
 import { setupDebug } from '../debug';
 import { GameState, type Viewer } from '../game/state';
 import { connectTwitch } from '../twitch/connect';
+import { users } from '../twitch/users';
+import { avatarKey, fallbackKey, loadAvatar } from '../twitch/avatars';
 
 type Body = MatterJS.BodyType;
 
@@ -46,6 +48,7 @@ export class Game extends Phaser.Scene {
   private toRemove: Ball[] = [];
   readonly state = new GameState(params.maxBalls, PODIUM_MS);
   private loading = false;
+  private pendingAvatars = new Set<string>();
   private paused = false; // !pachinko stop : le podium reste affiché jusqu'à !pachinko start
 
   constructor() { super({ key: 'Game', active: true }); }
@@ -178,25 +181,50 @@ export class Game extends Phaser.Scene {
   requestDrop(viewer: Viewer, x: number): boolean {
     if (!this.map || !this.state.canDrop(viewer.id)) return false;
     this.state.ballStarted(viewer);
-    this.drop(viewer.id, x);
+    this.drop(viewer, x);
     this.game.events.emit('drop', viewer);
     return true;
   }
 
-  /** Lâche une bille en x (coordonnée plateau). */
-  private drop(userId: string, x: number): Ball {
+  /** Lâche une bille en x (coordonnée plateau). La bille tombe tout de suite, l'avatar arrive après. */
+  private drop(viewer: Viewer, x: number): Ball {
     const bx = Phaser.Math.Clamp(x, WALL + BALL_R + 2, BOARD_W - WALL - BALL_R - 2);
     const y = BALL_R + 24;
     const body = this.matter.add.circle(bx, y, BALL_R, {
       restitution: 0.5, friction: 0.001, frictionAir: 0.0008, label: 'ball',
     });
     this.matter.body.setVelocity(body, { x: Phaser.Math.FloatBetween(-0.6, 0.6), y: 0 });
-    const img = this.add.image(bx, y, 'ball').setDisplaySize(BALL_R * 2, BALL_R * 2);
+    const hasAvatar = this.textures.exists(avatarKey(viewer.id));
+    const key = hasAvatar ? avatarKey(viewer.id) : fallbackKey(this, viewer, this.theme.font.family);
+    if (!hasAvatar) this.fetchIdentity(viewer);
+    const img = this.add.image(bx, y, key).setDisplaySize(BALL_R * 2, BALL_R * 2);
     const ball: Ball = {
-      userId, body, img, done: false, hits: new Map(), anchor: { x: bx, y, t: this.time.now }, lastNudge: 0,
+      userId: viewer.id, body, img, done: false, hits: new Map(), anchor: { x: bx, y, t: this.time.now }, lastNudge: 0,
     };
     this.balls.set(body.id, ball);
     return ball;
+  }
+
+  /** Nom + avatar en arrière-plan ; échange la texture des billes en jeu quand l'avatar arrive. */
+  private fetchIdentity(viewer: Viewer) {
+    if (this.pendingAvatars.has(viewer.id)) return;
+    this.pendingAvatars.add(viewer.id);
+    void users.resolve(viewer.id)
+      .then((info) => {
+        if (!info) return false;
+        if (this.state.players.get(viewer.id)?.name !== info.name) {
+          this.state.rename(viewer.id, info.name);
+          this.game.events.emit('player', viewer.id);
+        }
+        return info.avatar ? loadAvatar(this, viewer, info.avatar) : false;
+      })
+      .then((ok) => {
+        this.pendingAvatars.delete(viewer.id);
+        if (!ok) return;
+        for (const b of this.balls.values())
+          if (b.userId === viewer.id) b.img.setTexture(avatarKey(viewer.id)).setDisplaySize(BALL_R * 2, BALL_R * 2);
+        this.game.events.emit('player', viewer.id);
+      });
   }
 
   get ballCount() { return this.balls.size; }

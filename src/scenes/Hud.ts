@@ -42,7 +42,7 @@ export class Hud extends Phaser.Scene {
   create() {
     const ev = this.game.events;
     ev.on('theme', (t: Theme) => { this.theme = t; this.build(); });
-    for (const e of ['score', 'drop', 'phase']) ev.on(e, () => { this.dirty = true; });
+    for (const e of ['score', 'drop', 'phase', 'player']) ev.on(e, () => { this.dirty = true; });
     ev.on('phase', (p: string) => (p === 'podium' ? this.showPodium() : this.hidePodium()));
   }
 

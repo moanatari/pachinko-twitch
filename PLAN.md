@@ -42,7 +42,7 @@ terminée et vérifiée.
 - [x] 4. Rampes, tourniquets, bumpers + filet anti-blocage
 - [x] 5. État de partie + HUD (timer, classement, podium, cycle)
 - [x] 6. Tchat IRC + Heat
-- [ ] 7. Utilisateurs et avatars
+- [x] 7. Utilisateurs et avatars
 - [ ] 8. Juice + direction artistique de base (marquee, pop-ups, particules, glow, shake, animations)
 - [ ] 9. Thèmes saisonniers (Halloween, Hiver, Noël, Sakura, Plage)
 - [ ] 10. Les 4 autres patterns de génération
@@ -471,13 +471,13 @@ plus de 8 s sur 5 minutes de spam.
 un clic Heat aussi, et un viewer ne peut pas avoir deux billes.
 
 ### 7. Utilisateurs et avatars
-- [ ] `twitch/users.ts` : cache `Map` + `localStorage` (id → nom, couleur, URL avatar, date), TTL ≈ 7 jours.
-- [ ] Lookup `heat-api.j38.net/user/{id}` seulement si absent du cache ; requêtes identiques en cours
+- [x] `twitch/users.ts` : cache `Map` + `localStorage` (id → nom, couleur, URL avatar, date), TTL ≈ 7 jours.
+- [x] Lookup `heat-api.j38.net/user/{id}` seulement si absent du cache ; requêtes identiques en cours
       dédupliquées (une seule promesse par id).
-- [ ] Chargement de l'avatar (`crossOrigin = 'anonymous'`), rendu en cercle dans une `CanvasTexture`
+- [x] Chargement de l'avatar (`crossOrigin = 'anonymous'`), rendu en cercle dans une `CanvasTexture`
       `avatar-<id>` à 2× la taille de la bille, bordure couleur du viewer, puis **reflet spéculaire
       chromé dessiné par-dessus** (même dégradé que `drawBall`) pour que la bille reste « en métal ».
-- [ ] Fallback immédiat : bille colorée + initiale ; échange de texture quand l'avatar arrive.
+- [x] Fallback immédiat : bille colorée + initiale ; échange de texture quand l'avatar arrive.
 
 ⚠️ Vigilance
 - La bille doit tomber **tout de suite**, sans attendre le lookup réseau.
@@ -486,7 +486,7 @@ un clic Heat aussi, et un viewer ne peut pas avoir deux billes.
 - Ne pas créer une texture par bille : une par **user**, réutilisée à chaque relance.
 - Gérer l'échec du lookup (API Heat en panne) sans casser le jeu.
 
-- [ ] **Vérif (étape terminée)** : billes avec avatar pour des comptes réels ; après rechargement de la page, pas de
+- [x] **Vérif (étape terminée)** : billes avec avatar pour des comptes réels ; après rechargement de la page, pas de
 nouvelle requête pour les users en cache.
 
 ### 8. Juice + direction artistique de base

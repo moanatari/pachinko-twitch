@@ -54,6 +54,15 @@ describe('GameState — scores', () => {
     expect(s.players.get('a')).toMatchObject({ name: 'AliceRenamed', score: 12 });
   });
 
+  it('rename() met à jour le nom d\'un joueur connu, ignore les inconnus', () => {
+    const s = started();
+    s.ballStarted({ ...alice, name: 'Viewer-1234' });
+    s.rename('a', 'Alice');
+    s.rename('zzz', 'Nobody');
+    expect(s.players.get('a')!.name).toBe('Alice');
+    expect(s.players.has('zzz')).toBe(false);
+  });
+
   it('ignore les points d\'un viewer inconnu', () => {
     const s = started();
     s.addScore('zzz', 5, 10);

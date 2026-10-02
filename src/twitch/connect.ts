@@ -2,6 +2,7 @@ import { params, BOARD_W, WIDTH, WALL } from '../config';
 import type { Game } from '../scenes/Game';
 import { connectChat } from './chat';
 import { connectHeat } from './heat';
+import { users, colorFor } from './users';
 
 const log = (m: string) => { if (params.debug) console.log('[twitch]', m); };
 
@@ -11,9 +12,9 @@ export function connectTwitch(game: Game, channel: string) {
     onRoomId: (roomId) => {
       log(`room-id ${roomId}`);
       connectHeat(roomId, BOARD_W / WIDTH, (c) => {
-        // ponytail: nom provisoire, remplacé par le lookup users.ts (étape 7)
-        const name = c.anonymous ? `Anonyme-${c.id.slice(-4)}` : `Viewer-${c.id.slice(-4)}`;
-        game.requestDrop({ id: c.id, name, color: '#ffffff' }, c.x * BOARD_W);
+        // nom en cache si déjà vu, sinon provisoire (Game le remplace dès que le lookup répond)
+        const name = users.get(c.id)?.name ?? `${c.anonymous ? 'Anonyme' : 'Viewer'}-${c.id.slice(-4)}`;
+        game.requestDrop({ id: c.id, name, color: colorFor(c.id) }, c.x * BOARD_W);
       }, log);
     },
     onCommand: (cmd, tags, login) => {
@@ -23,7 +24,7 @@ export function connectTwitch(game: Game, channel: string) {
       }
       const id = tags['user-id'];
       if (!id) return;
-      const viewer = { id, name: tags['display-name'] || login, color: tags.color || '#ffffff' };
+      const viewer = { id, name: tags['display-name'] || login, color: tags.color || colorFor(id) };
       const pct = cmd.pct ?? Math.random() * 100;
       game.requestDrop(viewer, WALL + (pct / 100) * (BOARD_W - 2 * WALL));
     },

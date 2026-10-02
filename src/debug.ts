@@ -1,12 +1,13 @@
 import Phaser from 'phaser';
 import { params, BOARD_W, WALL } from './config';
 import type { Game } from './scenes/Game';
+import { colorFor } from './twitch/users';
 
 /** ?debug=1 : clic = drop d'un faux viewer, touche B = +10 bots, compteurs FPS / billes / points. */
 export function setupDebug(scene: Game) {
   if (!params.debug) return;
   let clicks = 0;
-  const fake = (id: string) => ({ id, name: id, color: '#ffffff' });
+  const fake = (id: string) => ({ id, name: id, color: colorFor(id) });
   scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
     if (p.x < BOARD_W) scene.requestDrop(fake(`debug-${++clicks}`), p.x);
   });
