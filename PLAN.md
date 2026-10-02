@@ -179,14 +179,14 @@ Seed aléatoire à chaque partie, forçable via `?seed=` (rejouer une carte).
 Chaque étape se termine par sa vérification. Ne pas passer à la suivante tant qu'elle échoue.
 
 ### 1. Scaffold Vite + TS + Phaser
-- [ ] `npm create vite@latest` (template `vanilla-ts`), puis `npm i phaser` et `npm i -D vitest`.
-- [ ] Scripts `dev`, `build`, `preview`, `test` dans `package.json`.
-- [ ] `vite.config.ts` : `base: './'` pour que `dist/index.html` fonctionne en fichier local dans OBS.
-- [ ] `src/config.ts` : lecture des params URL (`channel`, `duration`, `maxBalls`, `seed`, `shake`,
+- [x] `npm create vite@latest` (template `vanilla-ts`), puis `npm i phaser` et `npm i -D vitest`.
+- [x] Scripts `dev`, `build`, `preview`, `test` dans `package.json`.
+- [x] `vite.config.ts` : `base: './'` pour que `dist/index.html` fonctionne en fichier local dans OBS.
+- [x] `src/config.ts` : lecture des params URL (`channel`, `duration`, `maxBalls`, `seed`, `shake`,
       `debug`, `bots`) avec valeurs par défaut et bornes (ex. `duration` entre 1 et 60).
-- [ ] `src/main.ts` : jeu Phaser 1920×1080, `type: WEBGL`, `transparent: true`,
+- [x] `src/main.ts` : jeu Phaser 1920×1080, `type: WEBGL`, `transparent: true`,
       `scale.mode: FIT` + `autoCenter`, physique Matter (gravité y ≈ 1), scènes `Game` + `Hud` vides.
-- [ ] Fond du plateau dessiné par la scène (zone gauche 1440 px), panneau droit 480 px.
+- [x] Fond du plateau dessiné par la scène (zone gauche 1440 px), panneau droit 480 px.
 
 ⚠️ Vigilance
 - Vérifier la version installée de Phaser (3.90 visée). Si npm installe Phaser 4, épingler `phaser@3`
@@ -196,7 +196,7 @@ Chaque étape se termine par sa vérification. Ne pas passer à la suivante tant
 - Dans OBS : régler le FPS de la source navigateur à **60** (30 par défaut) et activer
   l'accélération matérielle de la source navigateur.
 
-- [ ] **Vérif (étape terminée)** : `npm run dev` affiche le plateau vide sans erreur console ; `npm run build` passe.
+- [x] **Vérif (étape terminée)** : `npm run dev` affiche le plateau vide sans erreur console ; `npm run build` passe.
 
 ### 2. RNG seedé + générateur de carte (pattern Classique) + tests
 - [ ] `src/rng.ts` : `mulberry32(seed)`, `range(min, max)`, `int(min, max)`, `pick(arr)`, `chance(p)`.
