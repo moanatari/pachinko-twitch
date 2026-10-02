@@ -19,7 +19,7 @@ export class UserDirectory {
   ) {
     try {
       const saved = JSON.parse(storage?.getItem(STORAGE_KEY) ?? '{}') as Record<string, UserInfo>;
-      for (const [id, u] of Object.entries(saved)) this.cache.set(id, u);
+      for (const [id, u] of Object.entries(saved)) if (typeof u?.name === 'string' && u.name) this.cache.set(id, u);
     } catch { /* cache corrompu : on repart de zéro */ }
   }
 
@@ -37,8 +37,10 @@ export class UserDirectory {
     if (!p) {
       p = this.fetchUser(id)
         .then((r) => {
-          if (!r) return null;
-          const info = { name: r.display_name, avatar: r.profile_image_url || null, at: this.now() };
+          // réponse d'un service tiers : un nom non valide finirait en `undefined` dans le Hud et figerait la boucle de jeu
+          if (typeof r?.display_name !== 'string' || !r.display_name.trim()) return null;
+          const avatar = typeof r.profile_image_url === 'string' && r.profile_image_url ? r.profile_image_url : null;
+          const info = { name: r.display_name, avatar, at: this.now() };
           this.cache.set(id, info);
           this.persist();
           return info;

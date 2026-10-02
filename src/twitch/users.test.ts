@@ -59,6 +59,25 @@ describe('UserDirectory', () => {
     expect(await dir.resolve('1')).toMatchObject({ name: 'Twitch' });
   });
 
+  it('réponse API inattendue (sans display_name) → null, rien en cache', async () => {
+    const storage = memoryStorage();
+    const dir = new UserDirectory(async () => ({}) as unknown as RemoteUser, storage);
+    expect(await dir.resolve('123')).toBeNull();
+    expect(dir.get('123')).toBeUndefined();
+    expect(storage.getItem('pachinko-users') ?? '{}').not.toContain('123');
+  });
+
+  it('profile_image_url invalide → nom gardé, pas d\'avatar', async () => {
+    const dir = new UserDirectory(async () => ({ display_name: 'Bob', profile_image_url: 42 }) as unknown as RemoteUser, null);
+    expect(await dir.resolve('7')).toMatchObject({ name: 'Bob', avatar: null });
+  });
+
+  it('entrée de cache sans nom (ancien cache corrompu) ignorée au chargement', () => {
+    const storage = memoryStorage();
+    storage.setItem('pachinko-users', JSON.stringify({ 9: { avatar: null, at: Date.now() } }));
+    expect(new UserDirectory(async () => null, storage).get('9')).toBeUndefined();
+  });
+
   it('ids anonymes (U…) jamais recherchés', async () => {
     const fetchUser = vi.fn(async () => twitchUser);
     expect(await new UserDirectory(fetchUser, null).resolve('U123')).toBeNull();
