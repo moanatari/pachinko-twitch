@@ -72,9 +72,9 @@ export interface ChatHandlers {
   onCommand: (cmd: Command, tags: Record<string, string>, login: string) => void;
 }
 
-export function connectChat(channel: string, h: ChatHandlers, log: (m: string) => void) {
+export function connectChat(channel: string, h: ChatHandlers, log: (m: string) => void): () => void {
   let roomId = '';
-  reconnectingSocket('wss://irc-ws.chat.twitch.tv:443', {
+  return reconnectingSocket('wss://irc-ws.chat.twitch.tv:443', {
     open: (ws) => {
       ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
       ws.send('PASS SCHMOOPIIE'); // ignoré par Twitch pour les connexions anonymes

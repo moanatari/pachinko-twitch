@@ -160,10 +160,9 @@ export class Hud extends Phaser.Scene {
       l.name.setText(short(p.name));
       l.points.setText(p.score.toLocaleString('fr-FR'));
       l.avatar.setTexture(this.ballTexture(p.id)).setDisplaySize(36, 36);
-      if (p.score > l.score) {
-        l.score = p.score;
+      if (p.score > l.score)
         this.tweens.add({ targets: l.points, scale: { from: 1.25, to: 1 }, duration: 250, ease: 'Back.easeOut' });
-      }
+      l.score = p.score; // aussi vers le bas (score remis à zéro par le streamer)
       if (l.slot !== i) {
         l.slot = i;
         this.tweens.killTweensOf(l.c);

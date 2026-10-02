@@ -21,8 +21,8 @@ export function parseHeatClick(raw: string, boardFraction: number): HeatClick | 
   return { id: d.id, anonymous: d.id.startsWith('U'), x: x / boardFraction };
 }
 
-export function connectHeat(roomId: string, boardFraction: number, onClick: (c: HeatClick) => void, log: (m: string) => void) {
-  reconnectingSocket(`wss://heat-api.j38.net/channel/${roomId}`, {
+export function connectHeat(roomId: string, boardFraction: number, onClick: (c: HeatClick) => void, log: (m: string) => void): () => void {
+  return reconnectingSocket(`wss://heat-api.j38.net/channel/${roomId}`, {
     message: (data) => {
       const click = parseHeatClick(data, boardFraction);
       if (click) onClick(click);

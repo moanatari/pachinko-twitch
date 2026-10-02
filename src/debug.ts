@@ -3,14 +3,10 @@ import { params, BOARD_W, WALL } from './config';
 import type { Game } from './scenes/Game';
 import { colorFor } from './twitch/users';
 
-/** ?debug=1 : clic = drop d'un faux viewer, touche B = +10 bots, T = thème suivant, compteurs FPS / billes / points. */
+/** ?debug=1 : touche B = +10 bots, T = thème suivant, compteurs FPS / billes / points. (Les clics sont au streamer.) */
 export function setupDebug(scene: Game) {
   if (!params.debug) return;
-  let clicks = 0;
   const fake = (id: string) => ({ id, name: id, color: colorFor(id) });
-  scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-    if (p.x < BOARD_W) scene.requestDrop(fake(`debug-${++clicks}`), p.x);
-  });
 
   let bots = params.bots;
   scene.input.keyboard?.on('keydown-B', () => { bots += 10; });

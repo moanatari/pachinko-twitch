@@ -8,7 +8,7 @@ new Phaser.Game({
   type: Phaser.WEBGL,
   width: WIDTH,
   height: HEIGHT,
-  transparent: true,
+  backgroundColor: '#000000', // fenêtre capturée par OBS : fond opaque, bandes noires hors 16:9
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   physics: {
     default: 'matter',

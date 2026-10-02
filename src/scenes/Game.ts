@@ -11,13 +11,19 @@ import type { Theme } from '../themes/types';
 import { setupDebug } from '../debug';
 import { GameState, type Viewer } from '../game/state';
 import { connectTwitch } from '../twitch/connect';
-import { users } from '../twitch/users';
+import { users, colorFor } from '../twitch/users';
+import { updateSettings, loadSettings, saveSettings, type Settings } from '../settings';
+import { safeStorage } from '../storage';
+import { Bans } from '../game/bans';
+import { History } from '../game/history';
 import { avatarKey, fallbackKey, loadAvatar, clearBallTextures } from '../twitch/avatars';
 import { THEMES } from '../themes/index';
 import type { AdminAction } from '../twitch/chat';
 import { Juice, type Pulse } from './fx';
 
 type Body = MatterJS.BodyType;
+export type ModAction = 'removeBall' | 'resetScore' | 'ban' | 'unban';
+const STREAMER: Viewer = { id: 'streamer', name: 'Streamer', color: colorFor('streamer') }; // sans chaîne / avant le room-id
 
 interface Ball {
   userId: string;
@@ -52,6 +58,12 @@ export class Game extends Phaser.Scene {
   private spinners: SpinnerRt[] = [];
   private toRemove: Ball[] = [];
   readonly state = new GameState(params.maxBalls, PODIUM_MS);
+  private readonly kv = safeStorage();
+  readonly bans = new Bans(this.kv);
+  readonly history = new History(this.kv);
+  streamer: Viewer = STREAMER;
+  private disconnect?: () => void;
+  private recorded = false; // partie courante déjà entrée dans l'historique
   private loading = false;
   private pendingAvatars = new Set<string>();
   private forcedTheme?: string; // debug : touche T
@@ -65,10 +77,66 @@ export class Game extends Phaser.Scene {
     this.game.registry.set('state', this.state);
     this.buildFrame();
     this.matter.world.on('collisionstart', this.onCollision, this);
+    // le streamer joue en cliquant sur le plateau (menu ouvert : le calque DOM recouvre le canvas)
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (p.x < BOARD_W) this.requestDrop(this.streamer, p.x);
+    });
     setupDebug(this);
     await this.newGame(params.seed ?? undefined);
-    if (params.channel) connectTwitch(this, params.channel);
-    else if (!params.debug) console.warn('Paramètre ?channel=<login> manquant : aucune connexion Twitch');
+    this.connect();
+  }
+
+  /** (Re)connexion à la chaîne des réglages : sockets précédentes fermées proprement. */
+  private connect() {
+    this.disconnect?.();
+    this.disconnect = undefined;
+    this.streamer = STREAMER;
+    if (params.channel) this.disconnect = connectTwitch(this, params.channel);
+  }
+
+  /** room-id reçu du tchat : nom et avatar résolus par users.resolve au premier drop. */
+  setStreamer(roomId: string, login: string) {
+    this.streamer = { id: roomId, name: login, color: colorFor(roomId) };
+  }
+
+  /** Réglages du menu : sauvegardés (sans les surcharges d'URL), puis appliqués.
+   *  Chaîne, plafond, shake : tout de suite ; durée, thème, enchaînement : partie suivante. */
+  applySettings(patch: Partial<Settings>) {
+    saveSettings(this.kv, updateSettings(loadSettings(this.kv), patch));
+    const channel = params.channel;
+    Object.assign(params, updateSettings(params, patch));
+    this.state.maxBalls = params.maxBalls;
+    if (patch.theme !== undefined) this.forcedTheme = undefined;
+    if (params.channel !== channel) this.connect();
+    this.game.events.emit('settings');
+  }
+
+  /** Modération depuis le menu. Le streamer ne peut pas s'exclure. */
+  moderate(action: ModAction, id: string) {
+    if (action === 'unban') this.bans.remove(id);
+    else if (action === 'resetScore') this.state.resetScore(id);
+    else {
+      if (action === 'ban' && id === this.streamer.id) return;
+      for (const b of [...this.balls.values()]) if (b.userId === id) this.removeBall(b);
+      if (action === 'ban') {
+        this.bans.add({ id, name: this.state.players.get(id)?.name ?? users.get(id)?.name ?? id, at: Date.now() });
+        this.state.remove(id);
+      }
+    }
+    this.game.events.emit('player', id);
+  }
+
+  /** Fin du podium (ou partie quittée en plein podium) : entrée dans l'historique, une seule fois. */
+  private recordGame() {
+    if (this.recorded || this.state.phase !== 'podium' || !this.map) return;
+    this.recorded = true;
+    const s = this.state;
+    this.history.add({
+      at: Date.now(), durationMs: s.endsAt - s.startedAt, pattern: this.map.pattern, seed: this.map.seed,
+      theme: this.theme.id, players: s.players.size,
+      top3: s.top(3).map(({ id, name, score }) => ({ id, name, score })),
+    });
+    this.game.events.emit('history');
   }
 
   /** Contrôle de partie (menu et commandes mods). Pendant un chargement : mis en file, rejoué à la fin. */
@@ -132,6 +200,7 @@ export class Game extends Phaser.Scene {
   }
 
   private async loadGame(seed: number, pattern?: PatternId) {
+    this.recordGame(); // carte suivante / Démarrer pendant le podium : la partie compte
     this.map = undefined; // suspend update() pendant la transition
     for (const ball of [...this.balls.values()]) this.removeBall(ball);
     this.toRemove.length = 0;
@@ -153,6 +222,7 @@ export class Game extends Phaser.Scene {
     }
     this.buildMap(generateMap(seed, pattern));
     this.state.start(Date.now(), params.duration * 60_000);
+    this.recorded = false;
     this.game.events.emit('phase', 'playing');
   }
 
@@ -252,9 +322,9 @@ export class Game extends Phaser.Scene {
   private staticBody(b: Body) { this.mapBodies.push(b); return b; }
   private track<T extends Phaser.GameObjects.GameObject>(o: T) { this.mapObjects.push(o); return o; }
 
-  /** Point d'entrée unique des drops (tchat, Heat, debug). Refusé si bille déjà active, plafond atteint ou podium. */
+  /** Point d'entrée unique des drops (tchat, Heat, souris). Refusé si exclu, bille déjà active, plafond, pause ou podium. */
   requestDrop(viewer: Viewer, x: number): boolean {
-    if (!this.map || !this.state.canDrop(viewer.id)) return false;
+    if (!this.map || this.bans.isBanned(viewer.id) || !this.state.canDrop(viewer.id)) return false;
     this.state.ballStarted(viewer);
     this.drop(viewer, x);
     this.game.events.emit('drop', viewer);
@@ -380,9 +450,12 @@ export class Game extends Phaser.Scene {
     if (!this.map) return;
     const transition = this.state.tick(Date.now());
     if (transition === 'podium') this.game.events.emit('phase', 'podium');
-    if (transition === 'next' && params.autoNext) {
-      void this.newGame();
-      return;
+    if (transition === 'next') {
+      this.recordGame();
+      if (params.autoNext) {
+        void this.newGame();
+        return;
+      }
     }
     // deux sous-pas par frame : une bille rapide ne traverse pas un obstacle fin
     const slowMo = this.state.phase === 'podium' ? 0.5 : 1; // ralenti pendant le podium
