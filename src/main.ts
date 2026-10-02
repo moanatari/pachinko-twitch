@@ -12,7 +12,8 @@ new Phaser.Game({
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   physics: {
     default: 'matter',
-    matter: { gravity: { x: 0, y: 1 }, enableSleeping: false, autoUpdate: false },
+    // itérations réduites (défaut 6/4) : les 2 sous-pas par frame assurent déjà la stabilité
+    matter: { gravity: { x: 0, y: 1 }, enableSleeping: false, autoUpdate: false, positionIterations: 4, velocityIterations: 3 },
   },
   scene: [Backdrop, Game, Hud],
 });

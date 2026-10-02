@@ -35,6 +35,7 @@ export class Juice {
   private pi = 0; private ri = 0; private li = 0;
   private pulses = new Set<Pulse>();
   private bulbs: Phaser.GameObjects.Image[] = [];
+  private halos: Phaser.GameObjects.Image[] = []; // détruits avec la carte (Game.clearMap)
   private emitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
   private sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
   private golden!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -58,6 +59,7 @@ export class Juice {
     this.bulbs = [];
     this.emitters = [];
     this.pulses.clear();
+    this.halos = [];
   }
 
   /** (Re)crée tout ce qui dépend des textures et couleurs du thème. */
@@ -67,11 +69,11 @@ export class Juice {
 
     this.trail = s.add.particles(0, 0, 'fx-glow', {
       lifespan: 260, scale: { start: 0.42, end: 0 }, alpha: { start: 0.3, end: 0 },
-      blendMode: 'ADD', emitting: false, maxParticles: 900, tint: hex(pal.text),
+      blendMode: 'ADD', emitting: false, maxParticles: 600, tint: hex(pal.text),
     }).setDepth(5);
     this.sparks = s.add.particles(0, 0, 'fx-hit', {
       speed: { min: 60, max: 170 }, lifespan: 320, scale: { start: 0.32, end: 0 },
-      blendMode: 'ADD', emitting: false, maxParticles: 400, tint: hex(pal.peg),
+      blendMode: 'ADD', emitting: false, maxParticles: 250, tint: hex(pal.peg),
     }).setDepth(30);
     this.golden = s.add.particles(0, 0, 'fx-hit', {
       speed: { min: 90, max: 260 }, lifespan: 520, scale: { start: 0.5, end: 0 },
@@ -79,11 +81,11 @@ export class Juice {
     }).setDepth(30);
     this.bursts = s.add.particles(0, 0, 'fx-bumper', {
       speed: { min: 160, max: 400 }, lifespan: 480, scale: { start: 0.6, end: 0 },
-      blendMode: 'ADD', emitting: false, maxParticles: 300, tint: [hex(pal.bumperCore), 0xffffff],
+      blendMode: 'ADD', emitting: false, maxParticles: 160, tint: [hex(pal.bumperCore), 0xffffff],
     }).setDepth(30);
     this.confetti = s.add.particles(0, 0, 'fx-confetti', {
       speed: { min: 180, max: 520 }, angle: { min: 235, max: 305 }, gravityY: 700, lifespan: 1400,
-      rotate: { min: 0, max: 360 }, scale: { min: 0.5, max: 1 }, emitting: false, maxParticles: 400,
+      rotate: { min: 0, max: 360 }, scale: { min: 0.5, max: 1 }, emitting: false, maxParticles: 250,
       tint: [hex(pal.accent), hex(pal.bumperCore), hex(pal.text)],
     }).setDepth(30);
     this.emitters = [this.trail, this.sparks, this.golden, this.bursts, this.confetti];
@@ -113,6 +115,9 @@ export class Juice {
     this.bulbs = spots.map(([x, y]) => s.add.image(x, y, 'fx-glow').setScale(0.7).setBlendMode('ADD').setDepth(6));
     this.wasFrenzy = true; // force la pose des teintes au premier update
   }
+
+  addHalo(img: Phaser.GameObjects.Image) { this.halos.push(img); }
+  clearHalos() { this.halos = []; }
 
   pulse(p: Pulse) {
     p.v = 1;
@@ -217,6 +222,8 @@ export class Juice {
       p.rect?.setAlpha(0.5 * v);
       if (v === 0) this.pulses.delete(p);
     }
+    const t = now / 550;
+    for (let i = 0; i < this.halos.length; i++) this.halos[i].setAlpha(0.3 + 0.25 * Math.sin(t + i * 1.7));
     // chenillard : une ampoule sur quatre allumée, frénétique et dorée après un gros gain
     const frenzy = now < this.frenzyUntil;
     this.chase += dt * (frenzy ? 4 : 1);

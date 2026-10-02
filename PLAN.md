@@ -602,12 +602,19 @@ ni hausse continue de la mémoire (onglet Memory de Chrome).
 - [x] **Vérif (étape terminée)** : `npm run test` vert ; chaque pattern forcé en debug donne des parties jouables.
 
 ### 11. Passe perf et réglages finaux
-- [ ] Mode bots (`?bots=N`, touche B) qui relance des billes en continu pour N faux users.
-- [ ] Compteur FPS et nombre de billes affichés en debug.
+- [x] Mode bots (`?bots=N`, touche B) qui relance des billes en continu pour N faux users.
+- [x] Compteur FPS et nombre de billes affichés en debug.
 - [ ] Mesure à 150 billes dans le navigateur **et** dans OBS ; profiler (onglet Performance de
       Chrome) si moins de 60 fps.
-- [ ] Ajustement des valeurs dans `config.ts` : points, forces, rayons, valeurs des bacs, durée du podium.
+- [x] Ajustement des valeurs dans `config.ts` : points, forces, rayons, valeurs des bacs, durée du podium.
 - [ ] Test réel complet sur la chaîne (tchat + Heat + avatars + partie complète).
+
+> Mesures du 2026-10-02 (Chrome, iGPU Intel UHD 630, vsync coupée, 150 billes) : 103–108 fps,
+> `Game.update` p50 ≈ 4,5 ms / p95 ≈ 7 ms. Leviers appliqués : glow PostFX remplacé par des halos
+> additifs (+15 fps), particules plafonnées, solveur Matter 4/3 itérations (0 bille sortie, 1 retirée
+> par l'anti-blocage sur 4 078). Équilibrage : bacs tirés par carte (un seul 500, jamais au bord),
+> déflecteurs muraux (le couloir le long des murs donnait le 500 à 30–45 % des billes), billes 32 px.
+> **Reste à faire par le streamer : mesure dans OBS et partie réelle sur la chaîne.**
 
 ⚠️ Vigilance
 - OBS rend souvent moins vite que Chrome : le chiffre qui compte est celui mesuré dans OBS.

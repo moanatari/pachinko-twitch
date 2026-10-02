@@ -15,11 +15,11 @@ export function setupDebug(scene: Game) {
   let bots = params.bots;
   scene.input.keyboard?.on('keydown-B', () => { bots += 10; });
   scene.input.keyboard?.on('keydown-T', () => scene.nextTheme());
-  // chaque bot relance dès que sa bille est terminée
+  // chaque bot relance dès que sa bille est terminée (4 spawns max par tick : pas de paquets)
   scene.time.addEvent({
-    delay: 120, loop: true, callback: () => {
-      for (let i = 0; i < bots; i++)
-        if (scene.requestDrop(fake(`bot-${i}`), Phaser.Math.Between(WALL, BOARD_W - WALL))) return; // un spawn par tick
+    delay: 100, loop: true, callback: () => {
+      for (let i = 0, spawned = 0; i < bots && spawned < 4; i++)
+        if (scene.requestDrop(fake(`bot-${i}`), Phaser.Math.Between(WALL, BOARD_W - WALL))) spawned++;
     },
   });
 

@@ -56,7 +56,6 @@ export class Game extends Phaser.Scene {
   private paused = false;
   private forcedTheme?: string; // debug : touche T
   private fx = new Juice(this);
-  private mapTweens: Phaser.Tweens.Tween[] = [];
   private frame = 0; // !pachinko stop : le podium reste affiché jusqu'à !pachinko start
 
   constructor() { super({ key: 'Game', active: true }); }
@@ -127,8 +126,7 @@ export class Game extends Phaser.Scene {
   }
 
   private clearMap() {
-    for (const t of this.mapTweens) t.remove();
-    this.mapTweens = [];
+    this.fx.clearHalos();
     for (const o of this.mapObjects) o.destroy();
     for (const b of this.mapBodies) this.matter.world.remove(b);
     this.mapObjects = [];
@@ -152,8 +150,8 @@ export class Game extends Phaser.Scene {
 
     for (const p of map.pegs) {
       const body = this.staticBody(this.matter.add.circle(p.x, p.y, PEG_R, { isStatic: true, label: 'peg' }));
+      if (p.golden) this.halo(p.x, p.y, PEG_R * 5, pal.pegGolden);
       const img = this.track(this.add.image(p.x, p.y, p.golden ? 'pegGolden' : 'peg').setDisplaySize(PEG_R * 2, PEG_R * 2));
-      if (p.golden) this.glow(img, pal.pegGolden, 2, 5);
       this.els.set(body.id, {
         kind: 'peg', points: p.golden ? PTS_PEG_GOLDEN : PTS_PEG, golden: p.golden,
         pulse: { kind: 'peg', v: 0, img, size: PEG_R * 2 },
@@ -168,8 +166,8 @@ export class Game extends Phaser.Scene {
 
     for (const b of map.bumpers) {
       const body = this.staticBody(this.matter.add.circle(b.x, b.y, b.radius, { isStatic: true, label: 'bumper' }));
+      this.halo(b.x, b.y, b.radius * 3, pal.bumperCore);
       const img = this.track(this.add.image(b.x, b.y, 'bumper').setDisplaySize(b.radius * 2, b.radius * 2));
-      this.glow(img, pal.bumperCore, 3, 6);
       // cœur de l'ampoule qui s'allume au contact
       const glow = this.track(this.add.image(b.x, b.y, 'fx-glow').setDisplaySize(b.radius * 2.4, b.radius * 2.4)
         .setBlendMode('ADD').setTint(hex(pal.bumperCore)).setAlpha(0));
@@ -214,10 +212,10 @@ export class Game extends Phaser.Scene {
     g.fillStyle(hex(pal.frame), 1).fillRect(WALL, map.binTop - 2, BOARD_W - WALL * 2, 3);
   }
 
-  /** Halo PostFX (WebGL) pulsant lentement : réservé aux éléments peu nombreux. */
-  private glow(img: Phaser.GameObjects.Image, color: string, from: number, to: number) {
-    const fx = img.preFX?.addGlow(hex(color), from, 0, false, 0.1, 12);
-    if (fx) this.mapTweens.push(this.tweens.add({ targets: fx, outerStrength: to, yoyo: true, repeat: -1, duration: 1100, ease: 'Sine.easeInOut' }));
+  /** Halo additif pulsant, posé SOUS l'élément. Remplace le glow PostFX (une passe de rendu par objet :
+   *  −15 fps mesurés sur iGPU à 150 billes) ; une image additive reste dans le lot de rendu. */
+  private halo(x: number, y: number, size: number, color: string) {
+    this.fx.addHalo(this.track(this.add.image(x, y, 'fx-glow').setDisplaySize(size, size).setBlendMode('ADD').setTint(hex(color))));
   }
 
   private staticBody(b: Body) { this.mapBodies.push(b); return b; }

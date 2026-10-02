@@ -42,7 +42,7 @@ export const PANEL_W = WIDTH - BOARD_W;
 
 // --- Plateau (px) ---
 export const WALL = 24; // épaisseur du cadre
-export const BALL_R = 14;
+export const BALL_R = 16; // 32 px : avatar reconnaissable
 export const PEG_R = 7;
 export const BUMPER_R = 26;
 export const SPINNER_R = 46; // demi-longueur d'un bras

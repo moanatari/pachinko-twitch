@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateMap, validateMap, BOARD_BOUNDS, PATTERNS, type MapData } from './mapgen';
-import { SPAWN_ZONE, BIN_H, BIN_CLEAR } from './config';
+import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK } from './config';
 
 const b = BOARD_BOUNDS;
 const binTop = b.bottom - BIN_H;
@@ -11,6 +11,11 @@ const empty = (): MapData => ({
   seed: 0, pattern: 'classique', pegs: [], ramps: [], spinners: [], bumpers: [], bins, binTop,
 });
 const midY = (b.top + SPAWN_ZONE + binTop - BIN_CLEAR) / 2;
+/** Déflecteur mural : rampe dont une extrémité touche un mur. */
+const isGuide = (r: { x: number; length: number; angle: number }) => {
+  const ex = (Math.cos(r.angle) * r.length) / 2 + RAMP_THICK / 2;
+  return r.x - ex <= b.left + 0.5 || r.x + ex >= b.right - 0.5;
+};
 
 describe('validateMap', () => {
   it('accepte une carte vide avec des bacs', () => expect(validateMap(empty())).toEqual([]));
@@ -53,6 +58,17 @@ describe('validateMap', () => {
     expect(validateMap(m).join()).toMatch(/bacs/);
   });
 
+  it('accepte un déflecteur collé au mur, refuse une rampe presque collée (piège)', () => {
+    const attached = empty();
+    // extrémité haute collée au mur gauche, descend vers l'intérieur
+    const L = 70, a = 0.6, dx = (Math.cos(a) * L) / 2, dy = (Math.sin(a) * L) / 2;
+    attached.ramps.push({ x: b.left + RAMP_THICK / 2 + dx, y: midY + dy, length: L, angle: a });
+    expect(validateMap(attached)).toEqual([]);
+    const nearly = empty();
+    nearly.ramps.push({ x: b.left + RAMP_THICK / 2 + dx + 15, y: midY + dy, length: L, angle: a });
+    expect(validateMap(nearly).join()).toMatch(/mur/);
+  });
+
   it('détecte une rampe trop plate', () => {
     const m = empty();
     m.ramps.push({ x: 600, y: midY, length: 200, angle: 0.05 });
@@ -77,6 +93,37 @@ describe('generateMap', () => {
     expect(m.pegs.length).toBeGreaterThan(50);
     expect(m.bumpers.length).toBeGreaterThanOrEqual(2);
     expect(m.bins.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('bacs : un seul jackpot à 500, jamais sur un bord ; les bords rapportent peu', () => {
+    for (let seed = 0; seed < 300; seed++) {
+      const m = generateMap(seed);
+      const pts = m.bins.map((x) => x.points);
+      expect(pts.filter((p) => p === 500), `seed ${seed}`).toHaveLength(1);
+      expect(pts[0]).toBeLessThanOrEqual(25);
+      expect(pts[pts.length - 1]).toBeLessThanOrEqual(25);
+    }
+  });
+
+  it('bacs symétriques pour le pattern symétrique', () => {
+    for (let seed = 0; seed < 50; seed++) {
+      const pts = generateMap(seed, 'symetrique').bins.map((x) => x.points);
+      expect(pts).toEqual([...pts].reverse());
+    }
+  });
+
+  it('déflecteurs sur les deux murs (pas de couloir libre le long des bords)', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 30; seed++) {
+        const m = generateMap(seed, pattern);
+        const touching = (side: 'left' | 'right') => m.ramps.filter((r) => {
+          const ex = (Math.cos(r.angle) * r.length) / 2 + RAMP_THICK / 2;
+          return side === 'left' ? r.x - ex <= b.left + 0.5 : r.x + ex >= b.right - 0.5;
+        }).length;
+        expect(touching('left'), `${pattern} ${seed}`).toBeGreaterThanOrEqual(3);
+        expect(touching('right'), `${pattern} ${seed}`).toBeGreaterThanOrEqual(3);
+      }
+    }
   });
 
   it('5 patterns disponibles', () =>
@@ -104,8 +151,8 @@ describe('generateMap', () => {
     for (const pattern of ['diagonale', 'entonnoirs'] as const) {
       for (let seed = 0; seed < 50; seed++) {
         const m = generateMap(seed, pattern);
-        expect(m.ramps.length, `${pattern} ${seed}`).toBeGreaterThanOrEqual(2);
-        const lowestRamp = Math.max(...m.ramps.map((r) => r.y + (Math.abs(Math.sin(r.angle)) * r.length) / 2));
+        expect(m.ramps.filter((r) => !isGuide(r)).length, `${pattern} ${seed}`).toBeGreaterThanOrEqual(2);
+        const lowestRamp = Math.max(...m.ramps.filter((r) => !isGuide(r)).map((r) => r.y + (Math.abs(Math.sin(r.angle)) * r.length) / 2));
         const pegsBelow = m.pegs.filter((p) => p.y > lowestRamp + 20).length;
         expect(pegsBelow, `${pattern} ${seed}`).toBeGreaterThanOrEqual(10);
       }

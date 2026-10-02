@@ -28,7 +28,6 @@ export interface MapData {
 }
 
 export const RAMP_MIN_ANGLE = 0.25; // rad : en dessous, la bille s'arrête sur la rampe
-const BIN_VALUES = [10, 25, 50, 100, 250, 500];
 
 // --- Géométrie : tout obstacle est une capsule (segment épaissi) ; un cercle = segment de longueur 0 ---
 interface Shape { x1: number; y1: number; x2: number; y2: number; r: number; name: string }
@@ -68,7 +67,10 @@ const ext = (s: Shape) => ({
 /** Erreur liée à la position d'un obstacle seul (murs, zones réservées), ou null. */
 function placementError(s: Shape, b: Bounds, binTop: number): string | null {
   const e = ext(s);
-  if (e.minX - b.left < MIN_GAP || b.right - e.maxX < MIN_GAP) return `${s.name} trop près d'un mur`;
+  // une rampe peut être collée au mur (déflecteur) ; sinon il faut un vrai passage, jamais une fente
+  const attached = (gap: number) => s.name === 'rampe' && Math.abs(gap) <= 0.5;
+  for (const gap of [e.minX - b.left, b.right - e.maxX])
+    if (gap < MIN_GAP && !attached(gap)) return `${s.name} trop près d'un mur`;
   if (e.minY < b.top + SPAWN_ZONE) return `${s.name} dans la zone de spawn`;
   if (e.maxY > binTop - BIN_CLEAR) return `${s.name} dans la bande au-dessus des bacs`;
   return null;
@@ -183,16 +185,38 @@ class Builder {
   get playBottom() { return this.m.binTop - BIN_CLEAR; }
 }
 
-function makeBins(rng: Rng, b: Bounds): Bin[] {
-  const count = rng.pick([7, 9, 11]);
-  const width = (b.right - b.left) / count;
-  const mid = (count - 1) / 2;
-  return Array.from({ length: count }, (_, i) => ({
-    x: b.left + i * width,
-    width,
-    // les bords, plus durs à atteindre, rapportent le plus
-    points: BIN_VALUES[Math.round((Math.abs(i - mid) / mid) * (BIN_VALUES.length - 1))],
-  }));
+/** Valeurs tirées à chaque carte : un seul jackpot (500), jamais sur un bord ; bords toujours bas.
+ *  Les bords ne doivent pas payer : une bille qui longe un mur est la plus prévisible. */
+function makeBins(rng: Rng, b: Bounds, symmetric: boolean): Bin[] {
+  const n = rng.pick([7, 9, 11]);
+  const width = (b.right - b.left) / n;
+  const pts: number[] = Array.from({ length: n }, () => rng.pick([10, 25, 50, 100]));
+  const half = symmetric ? (n - 1) / 2 : n - 1; // en symétrique, on décide la moitié gauche + le centre
+  pts[0] = rng.pick([10, 25]);
+  const jackpot = symmetric ? half : rng.int(1, n - 2);
+  pts[jackpot] = 500;
+  let big = rng.int(1, half);
+  if (big === jackpot) big = big > 1 ? big - 1 : big + 1;
+  pts[big] = 250;
+  if (symmetric) for (let i = 0; i < half; i++) pts[n - 1 - i] = pts[i];
+  else pts[n - 1] = rng.pick([10, 25]);
+  return pts.map((points, i) => ({ x: b.left + i * width, width, points }));
+}
+
+/** Déflecteurs collés aux murs, en quinconce : pas de couloir libre le long des bords. */
+function wallGuides(g: Builder, symmetric: boolean) {
+  const r = RAMP_THICK / 2;
+  for (const side of symmetric ? ['left'] : ['left', 'right']) {
+    for (let y = g.playTop + (side === 'left' ? 50 : 140); y < g.playBottom - 90; y += g.rng.range(170, 210)) {
+      const L = g.rng.range(55, 80), a = g.rng.range(0.5, 0.7);
+      const dx = (Math.cos(a) * L) / 2, dy = (Math.sin(a) * L) / 2;
+      const spec: Spec = side === 'left'
+        ? { kind: 'ramp', x: g.b.left + r + dx, y: y + dy, length: L, angle: a }
+        : { kind: 'ramp', x: g.b.right - r - dx, y: y + dy, length: L, angle: -a };
+      if (symmetric) g.sym(spec);
+      else g.place([spec]);
+    }
+  }
 }
 
 /** Grille en quinconce, en sautant les zones `skip`. */
@@ -332,8 +356,10 @@ export function generateMap(seed: number, pattern?: PatternId, b: Bounds = BOARD
   const rng = new Rng(seed);
   const p = pattern ?? rng.pick(PATTERNS);
   const m: MapData = {
-    seed, pattern: p, pegs: [], ramps: [], spinners: [], bumpers: [], bins: makeBins(rng, b), binTop: b.bottom - BIN_H,
+    seed, pattern: p, pegs: [], ramps: [], spinners: [], bumpers: [], bins: makeBins(rng, b, p === 'symetrique'), binTop: b.bottom - BIN_H,
   };
-  GENERATORS[p](new Builder(m, b, rng));
+  const g = new Builder(m, b, rng);
+  wallGuides(g, p === 'symetrique');
+  GENERATORS[p](g);
   return m;
 }
