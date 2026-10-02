@@ -99,6 +99,9 @@ export class Game extends Phaser.Scene {
     this.streamer = { id: roomId, name: login, color: colorFor(roomId) };
   }
 
+  /** Identité courante ou provisoire (clics avant le room-id) : jamais excluable. */
+  isStreamer(id: string) { return id === this.streamer.id || id === STREAMER.id; }
+
   /** Réglages du menu : sauvegardés (sans les surcharges d'URL), puis appliqués.
    *  Chaîne, plafond, shake : tout de suite ; durée, thème, enchaînement : partie suivante. */
   applySettings(patch: Partial<Settings>) {
@@ -116,7 +119,7 @@ export class Game extends Phaser.Scene {
     if (action === 'unban') this.bans.remove(id);
     else if (action === 'resetScore') this.state.resetScore(id);
     else {
-      if (action === 'ban' && id === this.streamer.id) return;
+      if (action === 'ban' && this.isStreamer(id)) return;
       for (const b of [...this.balls.values()]) if (b.userId === id) this.removeBall(b);
       if (action === 'ban') {
         this.bans.add({ id, name: this.state.players.get(id)?.name ?? users.get(id)?.name ?? id, at: Date.now() });

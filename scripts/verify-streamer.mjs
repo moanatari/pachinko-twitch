@@ -28,6 +28,11 @@ check('premier lancement : menu ouvert', await page.isVisible('.menu-backdrop'))
 check('premier lancement : onglet Réglages', (await page.textContent('.menu-tabs .active')) === 'Réglages');
 check('premier lancement : message', (await page.textContent('.menu-notice')).includes('Entre ta chaîne Twitch'));
 
+// 1 bis. Le streamer ne peut pas s'exclure, même sous son identité provisoire après l'arrivée du room-id
+check('drop du streamer provisoire', await page.evaluate(`${G}.requestDrop(${G}.streamer, 500)`));
+await page.evaluate(`${G}.setStreamer('999', 'x'); ${G}.moderate('ban', 'streamer')`);
+check('streamer provisoire : non excluable', !(await page.evaluate(`${G}.bans.isBanned('streamer')`)));
+
 // 2. Chaîne saisie → persistée après rechargement
 await page.fill('input[name=channel]', 'Pachinko_Test');
 await page.click('[data-act=save]');

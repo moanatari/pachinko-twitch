@@ -60,3 +60,9 @@ export function mergeSettings(defaults: Settings, saved: unknown, search: string
 
 /** Modification partielle venue du menu, validée champ par champ. */
 export const updateSettings = (base: Settings, patch: Partial<Settings>) => sanitizeSettings({ ...base, ...patch }, base);
+
+/** Valeurs brutes du formulaire du menu → champs réellement modifiés (champ vidé ou invalide = inchangé). */
+export function formPatch(form: Record<string, unknown>, current: Settings): Partial<Settings> {
+  const next = sanitizeSettings(form, current);
+  return Object.fromEntries(Object.entries(next).filter(([k, v]) => v !== current[k as keyof Settings]));
+}

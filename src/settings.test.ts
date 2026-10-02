@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  DEFAULT_SETTINGS, loadSettings, saveSettings, mergeSettings, updateSettings, normalizeChannel,
+  DEFAULT_SETTINGS, loadSettings, saveSettings, mergeSettings, updateSettings, normalizeChannel, formPatch,
 } from './settings';
 
 const memory = (init: Record<string, string> = {}) => {
@@ -73,4 +73,15 @@ describe('updateSettings', () => {
     saveSettings(kv, updateSettings(loadSettings(kv), { maxBalls: 80 }));
     expect(loadSettings(kv)).toMatchObject({ duration: 10, maxBalls: 80 });
   });
+});
+
+describe('formPatch (formulaire du menu)', () => {
+  const current = { ...DEFAULT_SETTINGS, channel: 'machaine' };
+  const form = { channel: 'machaine', duration: '5', maxBalls: '150', theme: 'auto', shake: true, autoNext: true };
+  it('ne renvoie que les champs modifiés', () =>
+    expect(formPatch({ ...form, duration: '3', shake: false }, current)).toEqual({ duration: 3, shake: false }));
+  it('champ numérique vidé : inchangé (pas de plafond à 1)', () =>
+    expect(formPatch({ ...form, duration: '', maxBalls: '' }, current)).toEqual({}));
+  it('valeurs bornées', () => expect(formPatch({ ...form, maxBalls: '9999' }, current)).toEqual({ maxBalls: 500 }));
+  it('chaîne vidée → aucune chaîne', () => expect(formPatch({ ...form, channel: '' }, current)).toEqual({ channel: null }));
 });

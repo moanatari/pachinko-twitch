@@ -6,7 +6,7 @@ import './menu.css';
 import { params, WIDTH } from '../config';
 import { THEMES } from '../themes/index';
 import { PATTERNS, type PatternId } from '../mapgen';
-import { normalizeChannel, type Settings } from '../settings';
+import { normalizeChannel, formPatch } from '../settings';
 import { users } from '../twitch/users';
 import { mmss } from '../scenes/Hud';
 import type { Game } from '../scenes/Game';
@@ -119,7 +119,7 @@ function init(game: Phaser.Game, g: Game) {
     return `<table class="menu-table">
       <thead><tr><th>#</th><th></th><th>Joueur</th><th>Score</th><th>Billes</th><th></th></tr></thead>
       <tbody>${rows.map(({ p, rank }) => {
-        const id = esc(p.id), me = p.id === g.streamer.id, inPlay = g.state.hasBall(p.id);
+        const id = esc(p.id), me = g.isStreamer(p.id), inPlay = g.state.hasBall(p.id);
         return `<tr>
           <td>${rank}</td><td>${avatar(p.id, p.color)}</td>
           <td>${esc(p.name)}${me ? ' <small>(toi)</small>' : ''}</td>
@@ -209,17 +209,14 @@ function init(game: Phaser.Game, g: Game) {
     const field = (name: string) => body.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
     const channel = normalizeChannel(field('channel').value);
     if (channel === undefined) return setNotice('Nom de chaîne invalide (lettres, chiffres et _ uniquement)');
-    const next: Settings = {
+    g.applySettings(formPatch({
       channel,
-      duration: Number(field('duration').value),
-      maxBalls: Number(field('maxBalls').value),
+      duration: field('duration').value, // champ vidé : valeur inchangée
+      maxBalls: field('maxBalls').value,
       theme: field('theme').value,
       shake: field('shake').checked,
       autoNext: field('autoNext').checked,
-    };
-    const patch: Record<string, unknown> = {};
-    for (const k of Object.keys(next) as (keyof Settings)[]) if (next[k] !== params[k]) patch[k] = next[k];
-    g.applySettings(patch as Partial<Settings>);
+    }, params));
     render(); // affiche les valeurs bornées
     setNotice(params.channel ? 'Réglages enregistrés' : 'Entre ta chaîne Twitch');
   }
