@@ -46,6 +46,7 @@ export const BALL_R = 14;
 export const PEG_R = 7;
 export const BUMPER_R = 26;
 export const SPINNER_R = 46; // demi-longueur d'un bras
+export const SPINNER_ARM = 10; // épaisseur des bras
 export const RAMP_THICK = 12;
 export const SPAWN_ZONE = 120; // bande libre en haut
 export const BIN_H = 110; // hauteur des bacs

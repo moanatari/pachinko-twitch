@@ -38,7 +38,7 @@ terminée et vérifiée.
 
 - [x] 1. Scaffold Vite + TS + Phaser
 - [x] 2. RNG seedé + générateur de carte (pattern Classique) + tests
-- [ ] 3. Fondations des thèmes (thème de base) + scène Game : plateau, billes, bacs, scoring de base
+- [x] 3. Fondations des thèmes (thème de base) + scène Game : plateau, billes, bacs, scoring de base
 - [ ] 4. Rampes, tourniquets, bumpers + filet anti-blocage
 - [ ] 5. État de partie + HUD (timer, classement, podium, cycle)
 - [ ] 6. Tchat IRC + Heat
@@ -222,7 +222,7 @@ Chaque étape se termine par sa vérification. Ne pas passer à la suivante tant
 
 **3a. Fondations des thèmes** (spec thèmes §1–3 ; seul le thème `base` existe à cette étape)
 
-- [ ] `src/themes/types.ts` : recopier les types de la spec (§1) : `DrawFn`, `SpriteSource`,
+- [x] `src/themes/types.ts` : recopier les types de la spec (§1) : `DrawFn`, `SpriteSource`,
       `ElementKey`, `ParticleKey`, `Palette`, `Theme`, plus :
 ```ts
 export type DeepPartial<T> = {
@@ -233,7 +233,7 @@ export type ThemeDef = DeepPartial<Theme> & { id: string; extends?: string };
 ```
       `DrawFn` = `(ctx: CanvasRenderingContext2D, w: number, h: number, palette: Palette) => void`
       (largeur/hauteur séparées pour les rampes, qui ne sont pas carrées).
-- [ ] Écrire le test qui échoue, `src/themes/resolve.test.ts` (registre fictif, indépendant des vrais thèmes) :
+- [x] Écrire le test qui échoue, `src/themes/resolve.test.ts` (registre fictif, indépendant des vrais thèmes) :
 ```ts
 import { describe, it, expect, vi } from 'vitest';
 import { resolveTheme, mergeTheme, todayMMDD } from './resolve';
@@ -287,8 +287,8 @@ describe('todayMMDD', () => {
     expect(todayMMDD(p)).toMatch(/^\d\d-\d\d$/));
 });
 ```
-- [ ] Lancer `npx vitest run src/themes` → **échec attendu** (module `./resolve` introuvable).
-- [ ] Implémenter `src/themes/resolve.ts` :
+- [x] Lancer `npx vitest run src/themes` → **échec attendu** (module `./resolve` introuvable).
+- [x] Implémenter `src/themes/resolve.ts` :
 ```ts
 import type { Theme, ThemeDef } from './types';
 import { THEMES } from './index';
@@ -334,7 +334,7 @@ export function todayMMDD(param?: string | null): string {
   return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 ```
-- [ ] `src/themes/draw.ts` : `DrawFn` du thème de base, dessinées à **2× la taille de la hitbox**
+- [x] `src/themes/draw.ts` : `DrawFn` du thème de base, dessinées à **2× la taille de la hitbox**
       (rayons dans `config.ts`) puis affichées avec `setDisplaySize`. Exemple de référence pour le style :
 ```ts
 export const drawPeg: DrawFn = (ctx, w, h, p) => {
@@ -352,11 +352,11 @@ export const drawPeg: DrawFn = (ctx, w, h, p) => {
       translucide), `drawSpinner` (croix chrome, moyeu rouge), `drawRamp` (barre laiton biseautée,
       `w × h`), `drawBall` (acier chromé + reflet spéculaire), `drawBackground` (laque `#0b0f1a` +
       vignettage), `drawSpark` (point lumineux flou, particule par défaut).
-- [ ] `src/themes/base.ts` : `ThemeDef` complet (palette §4 : or `#e8b84a`, rouge `#c8102e`,
+- [x] `src/themes/base.ts` : `ThemeDef` complet (palette §4 : or `#e8b84a`, rouge `#c8102e`,
       chrome `#d8dde6`, fond `#0b0f1a` ; `ambient: null` ; police Dela Gothic One ;
       `texts.podiumTitle: '大当り'`). `src/themes/index.ts` : `export const THEMES = { base }`.
-- [ ] Télécharger `DelaGothicOne-Regular.woff2` (Google Fonts, OFL) dans `public/fonts/`.
-- [ ] `src/themes/apply.ts` : `applyTheme(scene, theme): Promise<void>`
+- [x] Télécharger `DelaGothicOne-Regular.woff2` (Google Fonts, OFL) dans `public/fonts/`.
+- [x] `src/themes/apply.ts` : `applyTheme(scene, theme): Promise<void>`
       - pour chaque clé fixe (`peg`, `pegGolden`, `bumper`, `spinner`, `ramp`, `background`,
         `ball`, `fx-hit`, `fx-bumper`, `fx-bin`, `fx-confetti`) : source = `theme.sprites[k]` /
         `theme.particles[k]` ?? dessin par défaut de `draw.ts` ;
@@ -364,25 +364,25 @@ export const drawPeg: DrawFn = (ctx, w, h, p) => {
         chemin → `scene.load.image(key, url)` puis `scene.load.start()` et attente de `complete` ;
       - `scene.textures.exists(key)` → `scene.textures.remove(key)` avant de recréer ;
       - police : `const f = new FontFace(family, \`url(${url})\`); await f.load(); document.fonts.add(f)`.
-- [ ] `config.ts` : ajouter `theme` et `date` ; `main.ts` : `await applyTheme(...)` dans le `create`
+- [x] `config.ts` : ajouter `theme` et `date` ; `main.ts` : `await applyTheme(...)` dans le `create`
       de Game avant de construire la carte, avec `resolveTheme(todayMMDD(params.date), params.theme)`.
-- [ ] `npm run test` → vert.
+- [x] `npm run test` → vert.
 
 **3b. Scène Game**
 
-- [ ] Construire les corps Matter depuis `MapData` : murs latéraux, taquets (cercles statiques),
+- [x] Construire les corps Matter depuis `MapData` : murs latéraux, taquets (cercles statiques),
       murets et capteurs (`isSensor`) des bacs.
-- [ ] Rendu : des `Image` qui utilisent **uniquement** les clés fixes produites par `applyTheme`
+- [x] Rendu : des `Image` qui utilisent **uniquement** les clés fixes produites par `applyTheme`
       (`peg`, `pegGolden`, `ball`, …), jamais de référence au thème dans la scène.
-- [ ] `scenes/Backdrop.ts` : scène lancée **sous** Game, affiche la texture `background` (l'ambiance
+- [x] `scenes/Backdrop.ts` : scène lancée **sous** Game, affiche la texture `background` (l'ambiance
       animée s'y ajoutera à l'étape 9). Ordre des scènes : Backdrop → Game → Hud.
-- [ ] Spawn d'une bille : `matter.add.image` avec forme cercle, `restitution` ≈ 0.5, `friction` faible,
+- [x] Spawn d'une bille : `matter.add.image` avec forme cercle, `restitution` ≈ 0.5, `friction` faible,
       position X donnée, Y en haut, petite vitesse X aléatoire.
-- [ ] `collisionstart` : taquet → +1 (cooldown 150 ms par paire bille/taquet) ; capteur de bac →
+- [x] `collisionstart` : taquet → +1 (cooldown 150 ms par paire bille/taquet) ; capteur de bac →
       points du bac, destruction de la bille.
-- [ ] Mode debug : clic souris sur le plateau = drop pour un faux user, affichage des points en texte
+- [x] Mode debug : clic souris sur le plateau = drop pour un faux user, affichage des points en texte
       simple (le juice vient à l'étape 8).
-- [ ] Sous-pas physiques : `autoUpdate: false` et deux appels `world.step(delta / 2)` dans `update`.
+- [x] Sous-pas physiques : `autoUpdate: false` et deux appels `world.step(delta / 2)` dans `update`.
       Vitesse des billes clampée.
 
 ⚠️ Vigilance
@@ -398,7 +398,7 @@ export const drawPeg: DrawFn = (ctx, w, h, p) => {
   à chaque partie.
 - Canvas dessiné à 2× puis réduit : sinon les dégradés sont flous sur la source OBS 1080p.
 
-- [ ] **Vérif (étape terminée)** : `npm run test` vert (dont `resolve.test.ts`) ; en `?debug=1`, le plateau
+- [x] **Vérif (étape terminée)** : `npm run test` vert (dont `resolve.test.ts`) ; en `?debug=1`, le plateau
 a le rendu laiton/laque du thème de base, des clics font tomber des billes, les taquets donnent des
 points et les bacs détruisent les billes avec le bon score.
 

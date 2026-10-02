@@ -1,10 +1,15 @@
 import Phaser from 'phaser';
-import { BOARD_W, HEIGHT } from '../config';
 
+/** Fond du thème (+ ambiance animée à l'étape 9). Sous Game : insensible au camera shake de Game. */
 export class Backdrop extends Phaser.Scene {
+  private bg?: Phaser.GameObjects.Image;
+
   constructor() { super('Backdrop'); }
 
   create() {
-    this.add.rectangle(0, 0, BOARD_W, HEIGHT, 0x0b0f1a).setOrigin(0);
+    this.game.events.on('theme', () => {
+      this.bg?.destroy();
+      this.bg = this.add.image(0, 0, 'background').setOrigin(0);
+    });
   }
 }
