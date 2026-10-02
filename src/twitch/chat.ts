@@ -47,9 +47,15 @@ export function parseIrc(line: string): IrcMessage {
 export const isMod = (tags: Record<string, string>) =>
   /(^|,)(broadcaster|moderator)\//.test(tags.badges ?? '') || tags.mod === '1';
 
+export type AdminAction = 'pause' | 'resume' | 'end' | 'start' | 'skip';
+
 export type Command =
   | { type: 'drop'; pct: number | null } // pct = position en % de la largeur du plateau, null = aléatoire
-  | { type: 'admin'; action: 'start' | 'stop' | 'skip' };
+  | { type: 'admin'; action: AdminAction };
+
+const ADMIN: Record<string, AdminAction> = {
+  pause: 'pause', stop: 'pause', resume: 'resume', end: 'end', start: 'start', skip: 'skip',
+};
 
 export function parseCommand(text: string, mod: boolean): Command | null {
   const [cmd, arg] = text.trim().toLowerCase().split(/\s+/);
@@ -57,8 +63,7 @@ export function parseCommand(text: string, mod: boolean): Command | null {
     const n = parseFloat(arg ?? '');
     return { type: 'drop', pct: Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : null };
   }
-  if (cmd === '!pachinko' && mod && (arg === 'start' || arg === 'stop' || arg === 'skip'))
-    return { type: 'admin', action: arg };
+  if (cmd === '!pachinko' && mod && arg && Object.hasOwn(ADMIN, arg)) return { type: 'admin', action: ADMIN[arg] };
   return null;
 }
 

@@ -15,7 +15,7 @@ const RENDER_EVERY_MS = 250; // le top 10 n'est recalculé qu'au plus 4 fois par
 
 const hex = (c: string) => Phaser.Display.Color.HexStringToColor(c).color;
 const short = (s: string, n = 15) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-const mmss = (ms: number) => {
+export const mmss = (ms: number) => {
   const s = Math.ceil(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
@@ -50,6 +50,7 @@ export class Hud extends Phaser.Scene {
   private podium?: Phaser.GameObjects.Container;
   private podiumEmpty?: Phaser.GameObjects.Text;
   private podiumSlots: PodiumSlot[] = [];
+  private banner?: Phaser.GameObjects.Container;
   private dirty = true;
   private lastRender = 0;
 
@@ -62,9 +63,11 @@ export class Hud extends Phaser.Scene {
     ev.on('theme-unload', () => {
       this.hidePodium();
       this.ui?.destroy();
-      this.ui = this.timer = undefined;
+      this.banner?.destroy();
+      this.ui = this.timer = this.banner = undefined;
       this.lines = [];
     });
+    ev.on('pause', (on: boolean) => this.banner?.setVisible(on));
     ev.on('theme', (t: Theme) => { this.theme = t; this.build(); });
     for (const e of ['score', 'drop', 'phase', 'player']) ev.on(e, () => { this.dirty = true; });
     ev.on('phase', (p: string) => (p === 'podium' ? this.showPodium() : this.hidePodium()));
@@ -123,6 +126,11 @@ export class Hud extends Phaser.Scene {
     ui.add(this.add.text(cx, HEIGHT - 60, 'Clique sur le stream\nou tape !drop dans le tchat', {
       fontFamily: NAME_FONT, fontSize: '22px', color: pal.accent, align: 'center',
     }).setOrigin(0.5));
+    this.banner?.destroy();
+    this.banner = this.add.container(0, 0, [
+      this.add.rectangle(0, HEIGHT / 2 - 80, BOARD_W, 160, 0x000000, 0.7).setOrigin(0),
+      this.add.text(BOARD_W / 2, HEIGHT / 2, 'PAUSE', { fontFamily: font, fontSize: '110px', color: pal.accent }).setOrigin(0.5),
+    ]).setDepth(20).setVisible(this.state?.paused ?? false);
     this.dirty = true;
   }
 
@@ -232,8 +240,7 @@ export class Hud extends Phaser.Scene {
   update(time: number) {
     const s = this.state;
     if (!s || !this.timer) return;
-    const paused = this.game.registry.get('paused') === true;
-    this.timer.setText(paused ? 'PAUSE' : s.phase === 'podium' ? '0:00' : mmss(s.remainingMs(Date.now())));
+    this.timer.setText(s.phase === 'podium' ? '0:00' : mmss(s.remainingMs(Date.now())));
     if (this.dirty && time - this.lastRender > RENDER_EVERY_MS) {
       this.dirty = false;
       this.lastRender = time;

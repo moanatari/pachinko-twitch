@@ -52,11 +52,21 @@ describe('parseCommand', () => {
     expect(parseCommand('!dropzone', false)).toBeNull();
   });
 
-  it('commandes admin réservées aux mods', () => {
-    expect(parseCommand('!pachinko skip', true)).toEqual({ type: 'admin', action: 'skip' });
-    expect(parseCommand('!pachinko STOP', true)).toEqual({ type: 'admin', action: 'stop' });
+  it.each([
+    ['!pachinko pause', 'pause'],
+    ['!pachinko stop', 'pause'], // alias
+    ['!pachinko STOP', 'pause'],
+    ['!pachinko resume', 'resume'],
+    ['!pachinko end', 'end'],
+    ['!pachinko start', 'start'],
+    ['!pachinko skip', 'skip'],
+  ])('%s → %s', (text, action) => expect(parseCommand(text, true)).toEqual({ type: 'admin', action }));
+
+  it('commandes admin réservées aux mods, inconnues ignorées', () => {
     expect(parseCommand('!pachinko start', false)).toBeNull();
     expect(parseCommand('!pachinko dance', true)).toBeNull();
+    expect(parseCommand('!pachinko constructor', true)).toBeNull(); // pas de fuite du prototype
+    expect(parseCommand('!pachinko', true)).toBeNull();
   });
 });
 

@@ -14,6 +14,7 @@ import { connectTwitch } from '../twitch/connect';
 import { users } from '../twitch/users';
 import { avatarKey, fallbackKey, loadAvatar, clearBallTextures } from '../twitch/avatars';
 import { THEMES } from '../themes/index';
+import type { AdminAction } from '../twitch/chat';
 import { Juice, type Pulse } from './fx';
 
 type Body = MatterJS.BodyType;
@@ -53,10 +54,10 @@ export class Game extends Phaser.Scene {
   readonly state = new GameState(params.maxBalls, PODIUM_MS);
   private loading = false;
   private pendingAvatars = new Set<string>();
-  private paused = false;
   private forcedTheme?: string; // debug : touche T
   private fx = new Juice(this);
-  private frame = 0; // !pachinko stop : le podium reste affiché jusqu'à !pachinko start
+  private frame = 0; // traînées : une frame sur deux
+  private queued = new Map<string, () => void>(); // commandes reçues pendant un chargement, rejouées ensuite
 
   constructor() { super({ key: 'Game', active: true }); }
 
@@ -70,16 +71,43 @@ export class Game extends Phaser.Scene {
     else if (!params.debug) console.warn('Paramètre ?channel=<login> manquant : aucune connexion Twitch');
   }
 
-  /** Commandes mods : start (relance, sort de pause), stop (fin immédiate puis pause), skip (nouvelle carte). */
-  admin(action: 'start' | 'stop' | 'skip') {
-    if (action === 'stop') {
-      this.paused = true;
-      this.state.endNow(Date.now());
-    } else {
-      if (action === 'start') this.paused = false;
-      void this.newGame();
+  /** Contrôle de partie (menu et commandes mods). Pendant un chargement : mis en file, rejoué à la fin. */
+  admin(action: AdminAction) {
+    if (this.loading) {
+      this.queued.set(action, () => this.admin(action));
+      return;
     }
-    this.game.registry.set('paused', this.paused);
+    if (action === 'pause') return this.setPaused(true);
+    this.setPaused(false); // toute autre action sort de la pause
+    if (action === 'end') this.state.endNow(Date.now());
+    else if (action === 'skip' || (action === 'start' && this.state.phase === 'podium')) void this.newGame();
+  }
+
+  /** Nouvelle partie sur la même carte (seed + pattern) : menu Partie ou Historique. */
+  replay(seed: number, pattern?: PatternId) {
+    if (this.loading) {
+      this.queued.set('replay', () => this.replay(seed, pattern));
+      return;
+    }
+    this.setPaused(false);
+    void this.newGame(seed, pattern);
+  }
+
+  /** Gel complet : Game (physique, effets, tweens) et Backdrop (ambiance) ; le Hud reste actif pour le bandeau. */
+  private setPaused(on: boolean) {
+    if (on === this.state.paused) return;
+    if (on) {
+      this.state.pause(Date.now());
+      this.scene.pause();
+      this.scene.pause('Backdrop');
+    } else {
+      this.state.resume(Date.now());
+      // l'horloge de la scène saute pendant la pause : sans ça, l'anti-blocage retirerait toutes les billes
+      for (const b of this.balls.values()) b.anchor.t = this.game.loop.time;
+      this.scene.resume();
+      this.scene.resume('Backdrop');
+    }
+    this.game.events.emit('pause', on);
   }
 
   /** Debug (touche T) : thème suivant du registre, par le même chemin qu'un changement entre parties. */
@@ -90,17 +118,20 @@ export class Game extends Phaser.Scene {
   }
 
   /** Nouvelle partie : billes et carte détruites AVANT un éventuel changement de textures. */
-  async newGame(seed = Math.floor(Math.random() * 1e9)) {
-    if (this.loading) return; // ex. !pachinko skip spammé pendant un changement de thème
+  async newGame(seed = Math.floor(Math.random() * 1e9), pattern = patternParam()) {
+    if (this.loading) return; // ex. touche T spammée pendant un changement de thème
     this.loading = true;
     try {
-      await this.loadGame(seed);
+      await this.loadGame(seed, pattern);
     } finally {
       this.loading = false;
     }
+    const queued = [...this.queued.values()];
+    this.queued.clear();
+    for (const run of queued) run();
   }
 
-  private async loadGame(seed: number) {
+  private async loadGame(seed: number, pattern?: PatternId) {
     this.map = undefined; // suspend update() pendant la transition
     for (const ball of [...this.balls.values()]) this.removeBall(ball);
     this.toRemove.length = 0;
@@ -120,7 +151,7 @@ export class Game extends Phaser.Scene {
       this.game.registry.set('theme', theme);
       this.game.events.emit('theme', theme);
     }
-    this.buildMap(generateMap(seed, patternParam()));
+    this.buildMap(generateMap(seed, pattern));
     this.state.start(Date.now(), params.duration * 60_000);
     this.game.events.emit('phase', 'playing');
   }
@@ -349,7 +380,7 @@ export class Game extends Phaser.Scene {
     if (!this.map) return;
     const transition = this.state.tick(Date.now());
     if (transition === 'podium') this.game.events.emit('phase', 'podium');
-    if (transition === 'next' && !this.paused) {
+    if (transition === 'next' && params.autoNext) {
       void this.newGame();
       return;
     }
