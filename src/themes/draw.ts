@@ -169,6 +169,16 @@ export const drawSpark: DrawFn = (ctx, w, h) => {
   ctx.fillRect(0, 0, w, h);
 };
 
+/** Anneau d'onde (bumper), blanc : teinté à l'usage. */
+export const drawRing: DrawFn = (ctx, w) => {
+  const r = w / 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth = w * 0.06;
+  ctx.beginPath();
+  ctx.arc(r, r, r * 0.9, 0, Math.PI * 2);
+  ctx.stroke();
+};
+
 /** Confetti : petit rectangle doré. */
 export const drawConfetti: DrawFn = (ctx, w, h, p) => {
   ctx.fillStyle = p.accent;

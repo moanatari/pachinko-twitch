@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import {
   params, BOARD_W, HEIGHT, WALL, BALL_R, PEG_R, MAX_SPEED, RAMP_THICK, SPINNER_ARM,
   PTS_PEG, PTS_PEG_GOLDEN, PTS_BUMPER, PTS_SPINNER, HIT_COOLDOWN_MS, BUMPER_SPEED,
-  STUCK_NUDGE_MS, STUCK_KILL_MS, PODIUM_MS,
+  STUCK_NUDGE_MS, STUCK_KILL_MS, PODIUM_MS, BIG_WIN,
 } from '../config';
 import { generateMap, PATTERNS, type MapData, type PatternId } from '../mapgen';
 import { applyTheme } from '../themes/apply';
@@ -13,6 +13,7 @@ import { GameState, type Viewer } from '../game/state';
 import { connectTwitch } from '../twitch/connect';
 import { users } from '../twitch/users';
 import { avatarKey, fallbackKey, loadAvatar } from '../twitch/avatars';
+import { Juice, type Pulse } from './fx';
 
 type Body = MatterJS.BodyType;
 
@@ -29,7 +30,9 @@ interface Ball {
 interface El {
   kind: 'peg' | 'bin' | 'bumper' | 'spinner';
   points: number;
-  img?: Phaser.GameObjects.Image;
+  pulse: Pulse;
+  golden?: boolean;
+  binX?: number; // centre du bac (pop-up)
 }
 
 interface SpinnerRt { body: Body; img: Phaser.GameObjects.Image; speed: number }
@@ -49,7 +52,10 @@ export class Game extends Phaser.Scene {
   readonly state = new GameState(params.maxBalls, PODIUM_MS);
   private loading = false;
   private pendingAvatars = new Set<string>();
-  private paused = false; // !pachinko stop : le podium reste affiché jusqu'à !pachinko start
+  private paused = false;
+  private fx = new Juice(this);
+  private mapTweens: Phaser.Tweens.Tween[] = [];
+  private frame = 0; // !pachinko stop : le podium reste affiché jusqu'à !pachinko start
 
   constructor() { super({ key: 'Game', active: true }); }
 
@@ -95,6 +101,7 @@ export class Game extends Phaser.Scene {
     if (theme.id !== this.theme?.id) {
       this.theme = theme;
       await applyTheme(this, theme);
+      this.fx.rebuild(theme);
       this.game.registry.set('theme', theme);
       this.game.events.emit('theme', theme);
     }
@@ -104,6 +111,8 @@ export class Game extends Phaser.Scene {
   }
 
   private clearMap() {
+    for (const t of this.mapTweens) t.remove();
+    this.mapTweens = [];
     for (const o of this.mapObjects) o.destroy();
     for (const b of this.mapBodies) this.matter.world.remove(b);
     this.mapObjects = [];
@@ -128,7 +137,11 @@ export class Game extends Phaser.Scene {
     for (const p of map.pegs) {
       const body = this.staticBody(this.matter.add.circle(p.x, p.y, PEG_R, { isStatic: true, label: 'peg' }));
       const img = this.track(this.add.image(p.x, p.y, p.golden ? 'pegGolden' : 'peg').setDisplaySize(PEG_R * 2, PEG_R * 2));
-      this.els.set(body.id, { kind: 'peg', points: p.golden ? PTS_PEG_GOLDEN : PTS_PEG, img });
+      if (p.golden) this.glow(img, pal.pegGolden, 2, 5);
+      this.els.set(body.id, {
+        kind: 'peg', points: p.golden ? PTS_PEG_GOLDEN : PTS_PEG, golden: p.golden,
+        pulse: { kind: 'peg', v: 0, img, size: PEG_R * 2 },
+      });
     }
 
     for (const r of map.ramps) {
@@ -140,7 +153,11 @@ export class Game extends Phaser.Scene {
     for (const b of map.bumpers) {
       const body = this.staticBody(this.matter.add.circle(b.x, b.y, b.radius, { isStatic: true, label: 'bumper' }));
       const img = this.track(this.add.image(b.x, b.y, 'bumper').setDisplaySize(b.radius * 2, b.radius * 2));
-      this.els.set(body.id, { kind: 'bumper', points: PTS_BUMPER, img });
+      this.glow(img, pal.bumperCore, 3, 6);
+      // cœur de l'ampoule qui s'allume au contact
+      const glow = this.track(this.add.image(b.x, b.y, 'fx-hit').setDisplaySize(b.radius * 2.4, b.radius * 2.4)
+        .setBlendMode('ADD').setTint(hex(pal.bumperCore)).setAlpha(0));
+      this.els.set(body.id, { kind: 'bumper', points: PTS_BUMPER, pulse: { kind: 'bumper', v: 0, img, size: b.radius * 2, glow } });
     }
 
     for (const s of map.spinners) {
@@ -152,7 +169,7 @@ export class Game extends Phaser.Scene {
       this.staticBody(body);
       const img = this.track(this.add.image(s.x, s.y, 'spinner').setDisplaySize(s.radius * 2, s.radius * 2));
       this.spinners.push({ body, img, speed: s.speed });
-      this.els.set(body.id, { kind: 'spinner', points: PTS_SPINNER, img });
+      this.els.set(body.id, { kind: 'spinner', points: PTS_SPINNER, pulse: { kind: 'spinner', v: 0, img } });
     }
 
     const g = this.track(this.add.graphics());
@@ -162,7 +179,14 @@ export class Game extends Phaser.Scene {
       const sensor = this.staticBody(this.matter.add.rectangle(
         bin.x + bin.width / 2, map.binTop + binH / 2 + BALL_R * 2, bin.width - DIVIDER, binH,
         { isStatic: true, isSensor: true, label: 'bin' }));
-      this.els.set(sensor.id, { kind: 'bin', points: bin.points });
+      const rect = this.track(this.add.rectangle(bin.x, map.binTop, bin.width, binH, hex(pal.binHighlight))
+        .setOrigin(0).setBlendMode('ADD').setAlpha(0));
+      this.els.set(sensor.id, { kind: 'bin', points: bin.points, binX: bin.x + bin.width / 2, pulse: { kind: 'bin', v: 0, rect } });
+      if (bin.points >= BIG_WIN) {
+        // gros bacs : liseré rouge laqué + or
+        g.lineStyle(4, hex(pal.bumperCore), 1).strokeRect(bin.x + 5, map.binTop + 5, bin.width - 10, binH - 10);
+        g.lineStyle(1, hex(pal.accent), 1).strokeRect(bin.x + 9, map.binTop + 9, bin.width - 18, binH - 18);
+      }
       this.track(this.add.text(bin.x + bin.width / 2, map.binTop + binH * 0.55, String(bin.points), {
         fontFamily: this.theme.font.family, fontSize: '30px', color: pal.binHighlight,
       }).setOrigin(0.5));
@@ -172,6 +196,12 @@ export class Game extends Phaser.Scene {
       }
     });
     g.fillStyle(hex(pal.frame), 1).fillRect(WALL, map.binTop - 2, BOARD_W - WALL * 2, 3);
+  }
+
+  /** Halo PostFX (WebGL) pulsant lentement : réservé aux éléments peu nombreux. */
+  private glow(img: Phaser.GameObjects.Image, color: string, from: number, to: number) {
+    const fx = img.preFX?.addGlow(hex(color), from, 0, false, 0.1, 12);
+    if (fx) this.mapTweens.push(this.tweens.add({ targets: fx, outerStrength: to, yoyo: true, repeat: -1, duration: 1100, ease: 'Sine.easeInOut' }));
   }
 
   private staticBody(b: Body) { this.mapBodies.push(b); return b; }
@@ -202,6 +232,7 @@ export class Game extends Phaser.Scene {
       userId: viewer.id, body, img, done: false, hits: new Map(), anchor: { x: bx, y, t: this.time.now }, lastNudge: 0,
     };
     this.balls.set(body.id, ball);
+    this.fx.label(viewer.name, body.position);
     return ball;
   }
 
@@ -241,6 +272,7 @@ export class Game extends Phaser.Scene {
       if (el.kind === 'bin') {
         ball.done = true; // avant destruction : un 2e événement dans la même frame est ignoré
         this.score(ball, el.points, x, y);
+        this.fx.bin(el.pulse, el.binX ?? x, this.map!.binTop, el.points, el.points >= BIG_WIN);
         this.toRemove.push(ball);
         continue;
       }
@@ -249,6 +281,10 @@ export class Game extends Phaser.Scene {
       if (this.time.now - last < HIT_COOLDOWN_MS) continue;
       ball.hits.set(other.id, this.time.now);
       this.score(ball, el.points, x, y);
+      this.fx.popup(x, y, el.points);
+      if (el.kind === 'peg') this.fx.peg(el.pulse, x, y, !!el.golden);
+      else if (el.kind === 'bumper') this.fx.bumper(el.pulse, x, y);
+      else this.fx.spinner(el.pulse, x, y);
     }
   }
 
@@ -266,7 +302,9 @@ export class Game extends Phaser.Scene {
   private unstick(ball: Ball, now: number) {
     const { x, y } = ball.body.position;
     if (Math.hypot(x - ball.anchor.x, y - ball.anchor.y) > BALL_R * 2) {
-      ball.anchor = { x, y, t: now };
+      ball.anchor.x = x;
+      ball.anchor.y = y;
+      ball.anchor.t = now;
       return;
     }
     const idle = now - ball.anchor.t;
@@ -282,11 +320,6 @@ export class Game extends Phaser.Scene {
   private score(ball: Ball, points: number, x: number, y: number) {
     this.state.addScore(ball.userId, points, Date.now());
     this.game.events.emit('score', ball.userId, points, x, y);
-    // ponytail: pop-up provisoire non poolé, remplacé par le pool BitmapText à l'étape 8
-    const t = this.add.text(x, y - 10, `+${points}`, {
-      fontFamily: this.theme.font.family, fontSize: '22px', color: this.theme.palette.text,
-    }).setOrigin(0.5);
-    this.tweens.add({ targets: t, y: y - 50, alpha: 0, duration: 700, onComplete: () => t.destroy() });
   }
 
   /** Seul chemin de fin de bille (bac, anti-blocage, reset) : libère toujours le viewer. */
@@ -307,7 +340,8 @@ export class Game extends Phaser.Scene {
       return;
     }
     // deux sous-pas par frame : une bille rapide ne traverse pas un obstacle fin
-    const dt = Math.min(delta, 33.3) / 2; // Matter recommande ≤ 16.67 ms par pas
+    const slowMo = this.state.phase === 'podium' ? 0.5 : 1; // ralenti pendant le podium
+    const dt = (Math.min(delta, 33.3) / 2) * slowMo; // Matter recommande ≤ 16.67 ms par pas
     for (let i = 0; i < 2; i++) {
       // setAngle(..., true) met à jour anglePrev : le solveur transmet l'élan du tourniquet
       for (const s of this.spinners) this.matter.body.setAngle(s.body, s.body.angle + (s.speed * dt) / 16.667, true);
@@ -315,13 +349,16 @@ export class Game extends Phaser.Scene {
     }
     for (const s of this.spinners) s.img.setRotation(s.body.angle);
     const now = this.time.now;
+    const trail = this.frame++ % 2 === 0;
     for (const ball of this.balls.values()) {
       if (!ball.done) this.unstick(ball, now);
       const v = ball.body.velocity;
       const speed = Math.hypot(v.x, v.y);
       if (speed > MAX_SPEED) this.matter.body.setVelocity(ball.body, { x: (v.x / speed) * MAX_SPEED, y: (v.y / speed) * MAX_SPEED });
       ball.img.setPosition(ball.body.position.x, ball.body.position.y);
+      if (trail) this.fx.trailAt(ball.body.position.x, ball.body.position.y, speed);
     }
+    this.fx.update(delta);
     for (const ball of this.toRemove) this.removeBall(ball);
     this.toRemove.length = 0;
   }

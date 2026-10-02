@@ -1,5 +1,5 @@
 // Thème → textures aux clés fixes. Les scènes n'utilisent QUE ces clés, jamais le thème lui-même.
-import type Phaser from 'phaser';
+import Phaser from 'phaser';
 import type { Theme, SpriteSource, DrawFn } from './types';
 import * as D from './draw';
 import { PEG_R, BUMPER_R, SPINNER_R, BALL_R, RAMP_THICK, BOARD_W, HEIGHT } from '../config';
@@ -19,6 +19,7 @@ const SIZES: Record<string, [number, number]> = {
   'fx-bumper': [32, 32],
   'fx-bin': [32, 32],
   'fx-confetti': [32, 32],
+  'fx-ring': [128, 128],
 };
 
 const DEFAULTS: Record<string, DrawFn> = {
@@ -33,6 +34,7 @@ const DEFAULTS: Record<string, DrawFn> = {
   'fx-bumper': D.drawSpark,
   'fx-bin': D.drawSpark,
   'fx-confetti': D.drawConfetti,
+  'fx-ring': D.drawRing,
 };
 
 export async function applyTheme(scene: Phaser.Scene, theme: Theme): Promise<void> {
@@ -65,6 +67,38 @@ export async function applyTheme(scene: Phaser.Scene, theme: Theme): Promise<voi
     });
   }
   await loadFont(theme.font.family, theme.font.url);
+  makeDigits(scene, theme.font.family);
+}
+
+const DIGITS = '+0123456789';
+const DIGIT_W = 48, DIGIT_H = 64;
+
+/** Police bitmap des pop-ups, dessinée avec la police du thème (déjà chargée) : clé 'digits'. */
+function makeDigits(scene: Phaser.Scene, family: string) {
+  const canvas = document.createElement('canvas');
+  canvas.width = DIGIT_W * DIGITS.length;
+  canvas.height = DIGIT_H;
+  const ctx = canvas.getContext('2d')!;
+  ctx.font = `52px "${family}", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = 'rgba(0,0,0,0.75)'; // contour : lisible sur n'importe quel fond
+  ctx.fillStyle = '#ffffff'; // blanc : teinté à l'usage
+  [...DIGITS].forEach((ch, i) => {
+    const x = i * DIGIT_W + DIGIT_W / 2;
+    ctx.strokeText(ch, x, DIGIT_H / 2 + 2);
+    ctx.fillText(ch, x, DIGIT_H / 2 + 2);
+  });
+  if (scene.textures.exists('digits')) scene.textures.remove('digits');
+  scene.textures.addCanvas('digits', canvas);
+  const font = Phaser.GameObjects.RetroFont.Parse(scene, {
+    image: 'digits', width: DIGIT_W, height: DIGIT_H, chars: DIGITS, charsPerRow: DIGITS.length,
+    'offset.x': 0, 'offset.y': 0, 'spacing.x': 0, 'spacing.y': 0, lineSpacing: 0,
+  });
+  if (scene.cache.bitmapFont.exists('digits')) scene.cache.bitmapFont.remove('digits');
+  scene.cache.bitmapFont.add('digits', font);
 }
 
 async function loadFont(family: string, url: string) {

@@ -43,7 +43,7 @@ terminée et vérifiée.
 - [x] 5. État de partie + HUD (timer, classement, podium, cycle)
 - [x] 6. Tchat IRC + Heat
 - [x] 7. Utilisateurs et avatars
-- [ ] 8. Juice + direction artistique de base (marquee, pop-ups, particules, glow, shake, animations)
+- [x] 8. Juice + direction artistique de base (marquee, pop-ups, particules, glow, shake, animations)
 - [ ] 9. Thèmes saisonniers (Halloween, Hiver, Noël, Sakura, Plage)
 - [ ] 10. Les 4 autres patterns de génération
 - [ ] 11. Passe perf et réglages finaux
@@ -490,27 +490,27 @@ un clic Heat aussi, et un viewer ne peut pas avoir deux billes.
 nouvelle requête pour les users en cache.
 
 ### 8. Juice + direction artistique de base
-- [ ] Police bitmap des pop-ups générée dans `applyTheme` : après `document.fonts.load('64px "<family>"')`,
+- [x] Police bitmap des pop-ups générée dans `applyTheme` : après `document.fonts.load('64px "<family>"')`,
       dessiner `+0123456789` en grille fixe (11 cellules, une ligne) sur un canvas avec la police du
       thème, `textures.addCanvas('digits', canvas)`, puis enregistrer via
       `Phaser.GameObjects.RetroFont.Parse(scene, { image: 'digits', width, height, chars: '+0123456789',
       charsPerRow: 11, spacing: {x:0,y:0}, offset: {x:0,y:0}, lineSpacing: 0 })` et
       `scene.cache.bitmapFont.add('digits', …)` (supprimer l'entrée existante au changement de thème).
-- [ ] Pool d'environ 64 pop-ups `BitmapText` (`digits`) : montée + fade, taille et teinte selon la valeur.
-- [ ] **Marquee** : ~40 ampoules (sprite `fx-hit` teinté avec `palette.marquee`) le long du cadre du
+- [x] Pool d'environ 64 pop-ups `BitmapText` (`digits`) : montée + fade, taille et teinte selon la valeur.
+- [x] **Marquee** : ~40 ampoules (sprite `fx-hit` teinté avec `palette.marquee`) le long du cadre du
       plateau ; chenillard lent au repos, frénétique et or pendant ~1,5 s sur un gros bac
       (seuil dans `config.ts`).
-- [ ] Bumper « ampoule » : cœur qui s'allume (tint + alpha) au contact puis retombe.
-- [ ] Bac : flash plein de l'alvéole à l'entrée d'une bille ; gros bacs avec liseré rouge/or.
-- [ ] Filigrane du panneau : `theme.texts.watermark` (kanji) en alpha ≈ 0.06.
-- [ ] Traînée de vitesse derrière chaque bille, intensité proportionnelle à la vitesse.
-- [ ] Un émetteur de particules par type d'effet (étincelles taquet, burst bumper, confettis bac) via `explode()`.
-- [ ] Flash et scale tween des taquets touchés ; pulse et anneau d'onde des bumpers.
-- [ ] Glow PostFX sur bumpers et taquets dorés.
-- [ ] Camera shake sur bumper et gros bac, désactivable avec `?shake=0`.
-- [ ] Nom du viewer au-dessus de sa bille au spawn (fade après ~1 s).
-- [ ] Classement : lignes animées (tween Y) aux changements de rang, avec avatars.
-- [ ] Podium : slow-mo léger, avatars du top 3, confettis.
+- [x] Bumper « ampoule » : cœur qui s'allume (tint + alpha) au contact puis retombe.
+- [x] Bac : flash plein de l'alvéole à l'entrée d'une bille ; gros bacs avec liseré rouge/or.
+- [x] Filigrane du panneau : `theme.texts.watermark` (kanji) en alpha ≈ 0.06.
+- [x] Traînée de vitesse derrière chaque bille, intensité proportionnelle à la vitesse.
+- [x] Un émetteur de particules par type d'effet (étincelles taquet, burst bumper, confettis bac) via `explode()`.
+- [x] Flash et scale tween des taquets touchés ; pulse et anneau d'onde des bumpers.
+- [x] Glow PostFX sur bumpers et taquets dorés.
+- [x] Camera shake sur bumper et gros bac, désactivable avec `?shake=0`.
+- [x] Nom du viewer au-dessus de sa bille au spawn (fade après ~1 s).
+- [x] Classement : lignes animées (tween Y) aux changements de rang, avec avatars.
+- [x] Podium : slow-mo léger, avatars du top 3, confettis.
 
 ⚠️ Vigilance
 - Aucun `new` d'objet dans `update()` ni dans les handlers de collision : tout vient d'un pool.
@@ -523,7 +523,7 @@ nouvelle requête pour les users en cache.
   (cache vidé).
 - Le marquee ne doit pas recréer de tweens à chaque gros gain : un seul timer dont on change la vitesse.
 
-- [ ] **Vérif (étape terminée)** : en `?debug=1&bots=50`, le jeu est lisible et agréable, sans chute de
+- [x] **Vérif (étape terminée)** : en `?debug=1&bots=50`, le jeu est lisible et agréable, sans chute de
 FPS visible ; les pop-ups sont en Dela Gothic One dès le premier lancement (cache navigateur vidé).
 
 ### 9. Thèmes saisonniers
