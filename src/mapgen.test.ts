@@ -79,6 +79,51 @@ describe('generateMap', () => {
     expect(m.bins.length).toBeGreaterThanOrEqual(5);
   });
 
+  it('5 patterns disponibles', () =>
+    expect([...PATTERNS].sort()).toEqual(['classique', 'diagonale', 'entonnoirs', 'symetrique', 'trous']));
+
+  it('le tirage par seed couvre les 5 patterns', () => {
+    const seen = new Set(Array.from({ length: 200 }, (_, s) => generateMap(s).pattern));
+    expect(seen.size).toBe(5);
+  });
+
+  it('symétrique : chaque élément a son miroir', () => {
+    const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
+    const mx = (x: number) => b.left + b.right - x;
+    for (let seed = 0; seed < 50; seed++) {
+      const m = generateMap(seed, 'symetrique');
+      for (const p of m.pegs) expect(m.pegs.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y)), `seed ${seed} taquet`).toBe(true);
+      for (const p of m.bumpers) expect(m.bumpers.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y))).toBe(true);
+      for (const p of m.spinners)
+        expect(m.spinners.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y) && (near(q.x, p.x) || near(q.speed, -p.speed)))).toBe(true);
+      for (const r of m.ramps) expect(m.ramps.some((q) => near(q.x, mx(r.x)) && near(q.y, r.y) && near(q.angle, -r.angle))).toBe(true);
+    }
+  });
+
+  it('diagonale et entonnoirs : des rampes, et des taquets entre la dernière rampe et les bacs', () => {
+    for (const pattern of ['diagonale', 'entonnoirs'] as const) {
+      for (let seed = 0; seed < 50; seed++) {
+        const m = generateMap(seed, pattern);
+        expect(m.ramps.length, `${pattern} ${seed}`).toBeGreaterThanOrEqual(2);
+        const lowestRamp = Math.max(...m.ramps.map((r) => r.y + (Math.abs(Math.sin(r.angle)) * r.length) / 2));
+        const pegsBelow = m.pegs.filter((p) => p.y > lowestRamp + 20).length;
+        expect(pegsBelow, `${pattern} ${seed}`).toBeGreaterThanOrEqual(10);
+      }
+    }
+  });
+
+  it('entonnoirs : des tourniquets sous les entonnoirs', () => {
+    for (let seed = 0; seed < 50; seed++) expect(generateMap(seed, 'entonnoirs').spinners.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('trous : au moins 2 éléments spéciaux et une grille dense', () => {
+    for (let seed = 0; seed < 50; seed++) {
+      const m = generateMap(seed, 'trous');
+      expect(m.bumpers.length + m.spinners.length).toBeGreaterThanOrEqual(2);
+      expect(m.pegs.length).toBeGreaterThan(100);
+    }
+  });
+
   for (const pattern of PATTERNS) {
     it(`${pattern} : 1000 seeds valides`, () => {
       for (let seed = 0; seed < 1000; seed++) {

@@ -45,7 +45,7 @@ terminée et vérifiée.
 - [x] 7. Utilisateurs et avatars
 - [x] 8. Juice + direction artistique de base (marquee, pop-ups, particules, glow, shake, animations)
 - [x] 9. Thèmes saisonniers (Halloween, Hiver, Noël, Sakura, Plage)
-- [ ] 10. Les 4 autres patterns de génération
+- [x] 10. Les 4 autres patterns de génération
 - [ ] 11. Passe perf et réglages finaux
 
 ## Décisions prises
@@ -586,12 +586,12 @@ Hiver, Sakura, Plage ; la touche T fait défiler les 6 thèmes 20 fois de suite 
 ni hausse continue de la mémoire (onglet Memory de Chrome).
 
 ### 10. Les 4 autres patterns de génération
-- [ ] Symétrique : moitié gauche générée puis miroir (rampes : angle inversé ; tourniquets : sens inversé).
-- [ ] Diagonale : bandes de taquets en diagonale et rampes en zigzag/chevrons.
-- [ ] Trous : grille dense, zones vidées (cercles/rectangles), spinner ou bumper au centre des trous.
-- [ ] Entonnoirs : rampes en V qui concentrent vers des tourniquets, alternées avec des rangées de taquets.
-- [ ] Tirage du pattern par la seed ; `?pattern=` en debug pour forcer un pattern.
-- [ ] `mapgen.test.ts` étendu : 1000 seeds × 5 patterns.
+- [x] Symétrique : moitié gauche générée puis miroir (rampes : angle inversé ; tourniquets : sens inversé).
+- [x] Diagonale : bandes de taquets en diagonale et rampes en zigzag/chevrons.
+- [x] Trous : grille dense, zones vidées (cercles/rectangles), spinner ou bumper au centre des trous.
+- [x] Entonnoirs : rampes en V qui concentrent vers des tourniquets, alternées avec des rangées de taquets.
+- [x] Tirage du pattern par la seed ; `?pattern=` en debug pour forcer un pattern.
+- [x] `mapgen.test.ts` étendu : 1000 seeds × 5 patterns.
 
 ⚠️ Vigilance
 - Le miroir ne doit pas dupliquer un élément posé sur l'axe central (chevauchement).
@@ -599,7 +599,7 @@ ni hausse continue de la mémoire (onglet Memory de Chrome).
   la dernière rampe et les bacs.
 - Vérifier visuellement chaque pattern sur une dizaine de seeds, le test ne juge pas l'intérêt du jeu.
 
-- [ ] **Vérif (étape terminée)** : `npm run test` vert ; chaque pattern forcé en debug donne des parties jouables.
+- [x] **Vérif (étape terminée)** : `npm run test` vert ; chaque pattern forcé en debug donne des parties jouables.
 
 ### 11. Passe perf et réglages finaux
 - [ ] Mode bots (`?bots=N`, touche B) qui relance des billes en continu pour N faux users.

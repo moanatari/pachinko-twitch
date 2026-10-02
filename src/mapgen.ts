@@ -5,7 +5,7 @@ import {
   SPAWN_ZONE, BIN_H, BIN_CLEAR, MIN_GAP, SPINNER_SPEED,
 } from './config';
 
-export const PATTERNS = ['classique'] as const;
+export const PATTERNS = ['classique', 'symetrique', 'diagonale', 'trous', 'entonnoirs'] as const;
 export type PatternId = (typeof PATTERNS)[number];
 
 export interface Bounds { left: number; right: number; top: number; bottom: number }
@@ -114,37 +114,68 @@ export function validateMap(m: MapData, b: Bounds = BOARD_BOUNDS): string[] {
   return errors;
 }
 
+
 // --- Construction : chaque ajout est refusé s'il viole une règle ---
+type Spec =
+  | ({ kind: 'peg' } & Peg)
+  | ({ kind: 'bumper' } & Bumper)
+  | ({ kind: 'spinner' } & Spinner)
+  | ({ kind: 'ramp' } & Ramp);
+
+const shapeOf = (s: Spec): Shape =>
+  s.kind === 'peg' ? circle(s.x, s.y, PEG_R, 'taquet')
+    : s.kind === 'bumper' ? circle(s.x, s.y, s.radius, 'bumper')
+    : s.kind === 'spinner' ? circle(s.x, s.y, s.radius, 'tourniquet') // rayon de balayage complet
+    : rampShape(s);
+
 class Builder {
   readonly shapes: Shape[] = [];
   constructor(readonly m: MapData, readonly b: Bounds, readonly rng: Rng) {}
 
-  private add(s: Shape): boolean {
-    if (placementError(s, this.b, this.m.binTop)) return false;
-    if (this.shapes.some((o) => tooClose(o, s))) return false;
-    this.shapes.push(s);
+  /** Pose tous les éléments, ou aucun si l'un d'eux viole une règle (paires symétriques). */
+  place(specs: Spec[]): boolean {
+    const shapes = specs.map(shapeOf);
+    for (const [i, s] of shapes.entries()) {
+      if (placementError(s, this.b, this.m.binTop)) return false;
+      if (this.shapes.some((o) => tooClose(o, s))) return false;
+      if (shapes.slice(0, i).some((o) => tooClose(o, s))) return false;
+    }
+    for (const s of specs) {
+      if (s.kind === 'ramp' && Math.abs(s.angle) < RAMP_MIN_ANGLE) return false;
+    }
+    this.shapes.push(...shapes);
+    for (const s of specs) {
+      const { kind, ...e } = s;
+      if (kind === 'peg') this.m.pegs.push(e as Peg);
+      else if (kind === 'bumper') this.m.bumpers.push(e as Bumper);
+      else if (kind === 'spinner') this.m.spinners.push(e as Spinner);
+      else this.m.ramps.push(e as Ramp);
+    }
     return true;
   }
 
-  peg(x: number, y: number, golden = this.rng.chance(0.03)) {
-    if (this.add(circle(x, y, PEG_R, 'taquet'))) this.m.pegs.push({ x, y, golden });
+  peg(x: number, y: number, golden = this.rng.chance(0.03)) { return this.place([{ kind: 'peg', x, y, golden }]); }
+  bumper(x: number, y: number, radius = BUMPER_R) { return this.place([{ kind: 'bumper', x, y, radius }]); }
+  spinner(x: number, y: number, radius = SPINNER_R) {
+    return this.place([{ kind: 'spinner', x, y, radius, speed: this.spinnerSpeed() }]);
   }
-  bumper(x: number, y: number, radius = BUMPER_R): boolean {
-    if (!this.add(circle(x, y, radius, 'bumper'))) return false;
-    this.m.bumpers.push({ x, y, radius });
-    return true;
+  ramp(x: number, y: number, length: number, angle: number) { return this.place([{ kind: 'ramp', x, y, length, angle }]); }
+
+  spinnerSpeed() { return this.rng.pick([-1, 1]) * SPINNER_SPEED * this.rng.range(0.7, 1.3); }
+
+  get cx() { return (this.b.left + this.b.right) / 2; }
+
+  /** Image miroir par rapport à l'axe vertical central (rampes et tourniquets inversés). */
+  mirror(s: Spec): Spec {
+    const x = this.b.left + this.b.right - s.x;
+    if (s.kind === 'ramp') return { ...s, x, angle: -s.angle };
+    if (s.kind === 'spinner') return { ...s, x, speed: -s.speed };
+    return { ...s, x };
   }
-  spinner(x: number, y: number, radius = SPINNER_R): boolean {
-    if (!this.add(circle(x, y, radius, 'tourniquet'))) return false;
-    const speed = this.rng.pick([-1, 1]) * SPINNER_SPEED * this.rng.range(0.7, 1.3);
-    this.m.spinners.push({ x, y, radius, speed });
-    return true;
-  }
-  ramp(x: number, y: number, length: number, angle: number): boolean {
-    const r = { x, y, length, angle };
-    if (Math.abs(angle) < RAMP_MIN_ANGLE || !this.add(rampShape(r))) return false;
-    this.m.ramps.push(r);
-    return true;
+
+  /** Pose l'élément et son miroir ; sur l'axe central, un seul élément (pas de doublon superposé). */
+  sym(s: Spec) {
+    return Math.abs(s.x - this.cx) < 1 ? this.place([{ ...s, x: this.cx }]) : this.place([s, this.mirror(s)]);
   }
 
   /** Zone jouable verticale (hors spawn et bande des bacs). */
@@ -173,25 +204,129 @@ function pegGrid(g: Builder, dx: number, dy: number, skip: (x: number, y: number
       if (!skip(x, y)) g.peg(x + jitter(), y + jitter());
 }
 
+interface Hole { x: number; y: number; r: number; w?: number; h?: number } // cercle, ou rectangle si w/h
+const inHole = (h: Hole, x: number, y: number) =>
+  h.w ? Math.abs(x - h.x) < h.w / 2 && Math.abs(y - h.y) < h.h! / 2 : Math.hypot(h.x - x, h.y - y) < h.r;
+
+/** Zones vides qui ne se chevauchent pas. */
+function carveHoles(g: Builder, want: number, rMin: number, rMax: number, rects = false): Hole[] {
+  const holes: Hole[] = [];
+  for (let tries = 0; holes.length < want && tries < 60; tries++) {
+    const r = g.rng.range(rMin, rMax);
+    const h: Hole = { x: g.rng.range(g.b.left + r, g.b.right - r), y: g.rng.range(g.playTop + r, g.playBottom - r), r };
+    if (rects && g.rng.chance(0.5)) Object.assign(h, { w: r * 2.2, h: r * 1.5 });
+    if (holes.every((o) => Math.hypot(o.x - h.x, o.y - h.y) > o.r + h.r)) holes.push(h);
+  }
+  return holes;
+}
+
+function ensureBumpers(g: Builder, n: number) {
+  for (let tries = 0; g.m.bumpers.length < n && tries < 100; tries++)
+    g.bumper(g.rng.range(g.b.left, g.b.right), g.rng.range(g.playTop, g.playBottom));
+}
+
+/** Grille en quinconce, quelques trous garnis de bumpers ou de tourniquets. */
 function classique(g: Builder) {
-  const { rng } = g;
-  const holes: { x: number; y: number; r: number }[] = [];
-  for (let tries = 0, want = rng.int(2, 4); holes.length < want && tries < 50; tries++) {
-    const r = rng.range(90, 140);
-    const h = { x: rng.range(g.b.left + r, g.b.right - r), y: rng.range(g.playTop + r, g.playBottom - r), r };
+  const holes = carveHoles(g, g.rng.int(2, 4), 90, 140);
+  for (const h of holes) {
+    if (g.rng.chance(0.7)) g.bumper(h.x, h.y);
+    else g.spinner(h.x, h.y);
+  }
+  ensureBumpers(g, 2);
+  pegGrid(g, g.rng.range(72, 90), g.rng.range(60, 74), (x, y) => holes.some((h) => inHole(h, x, y)));
+}
+
+/** Moitié gauche générée puis reflétée : tout élément a son miroir. */
+function symetrique(g: Builder) {
+  const { rng, cx } = g;
+  const half = (cx - g.b.left) * 0.9;
+  if (rng.chance(0.5)) g.place([{ kind: 'bumper', x: cx, y: rng.range(g.playTop + 120, g.playBottom - 200), radius: BUMPER_R }]);
+  const holes: Hole[] = [];
+  for (let tries = 0, want = rng.int(1, 2); holes.length < want && tries < 40; tries++) {
+    const r = rng.range(90, 130);
+    const h = { x: rng.range(g.b.left + r, cx - r - 30), y: rng.range(g.playTop + r, g.playBottom - r), r };
     if (holes.every((o) => Math.hypot(o.x - h.x, o.y - h.y) > o.r + h.r)) holes.push(h);
   }
   for (const h of holes) {
-    if (rng.chance(0.7)) g.bumper(h.x, h.y);
-    else g.spinner(h.x, h.y);
+    if (rng.chance(0.6)) g.sym({ kind: 'bumper', x: h.x, y: h.y, radius: BUMPER_R });
+    else g.sym({ kind: 'spinner', x: h.x, y: h.y, radius: SPINNER_R, speed: g.spinnerSpeed() });
   }
-  for (let tries = 0; g.m.bumpers.length < 2 && tries < 100; tries++)
-    g.bumper(rng.range(g.b.left, g.b.right), rng.range(g.playTop, g.playBottom));
-
-  pegGrid(g, rng.range(72, 90), rng.range(60, 74), (x, y) => holes.some((h) => Math.hypot(h.x - x, h.y - y) < h.r));
+  if (rng.chance(0.6)) {
+    // paire de rampes en chevron, symétrique
+    const x = cx - rng.range(180, half), y = rng.range(g.playTop + 80, g.playBottom - 260);
+    g.sym({ kind: 'ramp', x, y, length: rng.range(140, 200), angle: rng.pick([-1, 1]) * rng.range(0.3, 0.5) });
+  }
+  const mirrored = holes.flatMap((h) => [h, { ...h, x: g.b.left + g.b.right - h.x }]);
+  const dx = rng.range(72, 90), dy = rng.range(60, 74);
+  for (let row = 0, y = g.playTop + PEG_R + 12; y < g.playBottom - PEG_R; y += dy, row++) {
+    for (let x = cx - (row % 2) * (dx / 2); x > g.b.left + MIN_GAP + PEG_R; x -= dx) {
+      const px = x + (Math.abs(x - cx) < 1 ? 0 : rng.range(-4, 4)), py = y + rng.range(-4, 4);
+      if (!mirrored.some((h) => inHole(h, px, py))) g.sym({ kind: 'peg', x: px, y: py, golden: rng.chance(0.03) });
+    }
+  }
 }
 
-const GENERATORS: Record<PatternId, (g: Builder) => void> = { classique };
+/** Bandes de taquets en diagonale + rampes en zigzag dans la partie haute. */
+function diagonale(g: Builder) {
+  const { rng } = g;
+  const W = g.b.right - g.b.left;
+  const rampZone = (g.playBottom - g.playTop) * 0.7; // les rampes restent au-dessus d'une zone de taquets
+  const n = rng.int(3, 5);
+  for (let i = 0; i < n; i++) {
+    const y = g.playTop + 60 + (i + 0.5) * ((rampZone - 60) / n);
+    const right = i % 2 === 0;
+    const x = g.b.left + W * (right ? rng.range(0.6, 0.78) : rng.range(0.22, 0.4));
+    g.ramp(x, y, rng.range(170, 260), (right ? 1 : -1) * rng.range(0.32, 0.5));
+  }
+  ensureBumpers(g, 2);
+  const dx = rng.range(70, 84), dy = rng.range(58, 68);
+  const shift = dx * rng.pick([0.3, -0.3]); // décalage par rangée → réseau cisaillé en diagonales
+  const lane = rng.int(3, 4); // une diagonale sur `lane` reste vide
+  for (let row = 0, y = g.playTop + PEG_R + 12; y < g.playBottom - PEG_R; y += dy, row++) {
+    const offset = (((row * shift) % dx) + dx) % dx;
+    for (let col = 0, x = g.b.left + MIN_GAP + PEG_R + 4 + offset; x < g.b.right - MIN_GAP - PEG_R; x += dx, col++) {
+      if ((col + Math.floor((row * shift) / dx)) % lane === 0) continue;
+      g.peg(x + rng.range(-3, 3), y + rng.range(-3, 3));
+    }
+  }
+}
+
+/** Grille dense creusée de zones vides (cercles ou rectangles), garnies au centre. */
+function trous(g: Builder) {
+  const holes = carveHoles(g, g.rng.int(3, 6), 80, 130, true);
+  for (const h of holes) {
+    if (g.rng.chance(0.5)) g.bumper(h.x, h.y);
+    else g.spinner(h.x, h.y);
+  }
+  ensureBumpers(g, 2);
+  pegGrid(g, g.rng.range(60, 68), g.rng.range(52, 60), (x, y) => holes.some((h) => inHole(h, x, y)));
+}
+
+/** Rampes en V qui concentrent les billes vers un tourniquet, entre des rangées de taquets. */
+function entonnoirs(g: Builder) {
+  const { rng } = g;
+  const H = g.playBottom - g.playTop;
+  const levels = [g.playTop + H * rng.range(0.18, 0.26), g.playTop + H * rng.range(0.5, 0.58)];
+  const gap = MIN_GAP + RAMP_THICK + 10; // ouverture au fond du V
+  levels.forEach((yb, level) => {
+    const count = level === 0 ? rng.int(1, 2) : rng.int(1, 2);
+    for (let k = 0; k < count; k++) {
+      const fx = g.b.left + ((k + 0.5) / count) * (g.b.right - g.b.left) + rng.range(-60, 60);
+      const L = rng.range(150, 210), a = rng.range(0.42, 0.6);
+      const dx = (L / 2) * Math.cos(a), dy = (L / 2) * Math.sin(a);
+      const ok = g.place([
+        { kind: 'ramp', x: fx - gap / 2 - dx, y: yb - dy, length: L, angle: a },
+        { kind: 'ramp', x: fx + gap / 2 + dx, y: yb - dy, length: L, angle: -a },
+      ]);
+      if (ok) g.spinner(fx, yb + SPINNER_R + MIN_GAP + 12);
+    }
+  });
+  if (!g.m.spinners.length) g.spinner(g.cx, g.playTop + H * 0.4);
+  ensureBumpers(g, 2);
+  pegGrid(g, rng.range(72, 88), rng.range(60, 72));
+}
+
+const GENERATORS: Record<PatternId, (g: Builder) => void> = { classique, symetrique, diagonale, trous, entonnoirs };
 
 export function generateMap(seed: number, pattern?: PatternId, b: Bounds = BOARD_BOUNDS): MapData {
   const rng = new Rng(seed);
