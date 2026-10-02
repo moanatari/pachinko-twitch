@@ -10,6 +10,7 @@ import { resolveTheme, todayMMDD } from '../themes/resolve';
 import type { Theme } from '../themes/types';
 import { setupDebug } from '../debug';
 import { GameState, type Viewer } from '../game/state';
+import { connectTwitch } from '../twitch/connect';
 
 type Body = MatterJS.BodyType;
 
@@ -44,6 +45,8 @@ export class Game extends Phaser.Scene {
   private spinners: SpinnerRt[] = [];
   private toRemove: Ball[] = [];
   readonly state = new GameState(params.maxBalls, PODIUM_MS);
+  private loading = false;
+  private paused = false; // !pachinko stop : le podium reste affiché jusqu'à !pachinko start
 
   constructor() { super({ key: 'Game', active: true }); }
 
@@ -53,10 +56,34 @@ export class Game extends Phaser.Scene {
     this.matter.world.on('collisionstart', this.onCollision, this);
     setupDebug(this);
     await this.newGame(params.seed ?? undefined);
+    if (params.channel) connectTwitch(this, params.channel);
+    else if (!params.debug) console.warn('Paramètre ?channel=<login> manquant : aucune connexion Twitch');
+  }
+
+  /** Commandes mods : start (relance, sort de pause), stop (fin immédiate puis pause), skip (nouvelle carte). */
+  admin(action: 'start' | 'stop' | 'skip') {
+    if (action === 'stop') {
+      this.paused = true;
+      this.state.endNow(Date.now());
+    } else {
+      if (action === 'start') this.paused = false;
+      void this.newGame();
+    }
+    this.game.registry.set('paused', this.paused);
   }
 
   /** Nouvelle partie : billes et carte détruites AVANT un éventuel changement de textures. */
   async newGame(seed = Math.floor(Math.random() * 1e9)) {
+    if (this.loading) return; // ex. !pachinko skip spammé pendant un changement de thème
+    this.loading = true;
+    try {
+      await this.loadGame(seed);
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  private async loadGame(seed: number) {
     this.map = undefined; // suspend update() pendant la transition
     for (const ball of [...this.balls.values()]) this.removeBall(ball);
     this.toRemove.length = 0;
@@ -247,7 +274,7 @@ export class Game extends Phaser.Scene {
     if (!this.map) return;
     const transition = this.state.tick(Date.now());
     if (transition === 'podium') this.game.events.emit('phase', 'podium');
-    if (transition === 'next') {
+    if (transition === 'next' && !this.paused) {
       void this.newGame();
       return;
     }

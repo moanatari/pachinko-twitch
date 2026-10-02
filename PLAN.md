@@ -41,7 +41,7 @@ terminée et vérifiée.
 - [x] 3. Fondations des thèmes (thème de base) + scène Game : plateau, billes, bacs, scoring de base
 - [x] 4. Rampes, tourniquets, bumpers + filet anti-blocage
 - [x] 5. État de partie + HUD (timer, classement, podium, cycle)
-- [ ] 6. Tchat IRC + Heat
+- [x] 6. Tchat IRC + Heat
 - [ ] 7. Utilisateurs et avatars
 - [ ] 8. Juice + direction artistique de base (marquee, pop-ups, particules, glow, shake, animations)
 - [ ] 9. Thèmes saisonniers (Halloween, Hiver, Noël, Sakura, Plage)
@@ -450,14 +450,14 @@ plus de 8 s sur 5 minutes de spam.
 - [x] **Vérif (étape terminée)** : partie de 1 min en debug (`?duration=1`) : timer, classement live, podium, nouvelle carte.
 
 ### 6. Tchat IRC + Heat
-- [ ] `twitch/chat.ts` : connexion WebSocket, `CAP REQ`, `PASS`/`NICK justinfan<n>`, `JOIN`.
-- [ ] Parseur IRC exporté (tags, préfixe, commande, params, message) + `chat.test.ts` avec de vraies
+- [x] `twitch/chat.ts` : connexion WebSocket, `CAP REQ`, `PASS`/`NICK justinfan<n>`, `JOIN`.
+- [x] Parseur IRC exporté (tags, préfixe, commande, params, message) + `chat.test.ts` avec de vraies
       lignes PRIVMSG, ROOMSTATE et PING.
-- [ ] `PING` → `PONG` ; reconnexion avec backoff (1 s, 2 s, 4 s… max 30 s).
-- [ ] Commandes : `!drop` (X aléatoire), `!drop N` (0–100, borné) ; `!pachinko start|stop|skip` si
+- [x] `PING` → `PONG` ; reconnexion avec backoff (1 s, 2 s, 4 s… max 30 s).
+- [x] Commandes : `!drop` (X aléatoire), `!drop N` (0–100, borné) ; `!pachinko start|stop|skip` si
       badge `broadcaster` ou `moderator`.
-- [ ] `room-id` du ROOMSTATE → ouverture de `twitch/heat.ts`.
-- [ ] `twitch/heat.ts` : WebSocket Heat, ne traiter que `type === 'click'`, `parseFloat(x)`,
+- [x] `room-id` du ROOMSTATE → ouverture de `twitch/heat.ts`.
+- [x] `twitch/heat.ts` : WebSocket Heat, ne traiter que `type === 'click'`, `parseFloat(x)`,
       ids `A…` ignorés, `U…` en « Anonyme-xxxx », clics hors plateau ignorés ; reconnexion avec backoff.
 
 ⚠️ Vigilance
@@ -467,7 +467,7 @@ plus de 8 s sur 5 minutes de spam.
   avec la largeur de la fenêtre.
 - Ne jamais logger de données viewers au-delà du nécessaire en prod (logs seulement en debug).
 
-- [ ] **Vérif (étape terminée)** : `npm run test` vert ; en réel, `!drop` depuis le tchat lâche une bille au bon endroit,
+- [x] **Vérif (étape terminée)** : `npm run test` vert ; en réel, `!drop` depuis le tchat lâche une bille au bon endroit,
 un clic Heat aussi, et un viewer ne peut pas avoir deux billes.
 
 ### 7. Utilisateurs et avatars

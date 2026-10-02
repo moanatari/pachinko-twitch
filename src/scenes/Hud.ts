@@ -149,7 +149,8 @@ export class Hud extends Phaser.Scene {
   update(time: number) {
     const s = this.state;
     if (!s || !this.timer) return;
-    this.timer.setText(s.phase === 'podium' ? '0:00' : mmss(s.remainingMs(Date.now())));
+    const paused = this.game.registry.get('paused') === true;
+    this.timer.setText(paused ? 'PAUSE' : s.phase === 'podium' ? '0:00' : mmss(s.remainingMs(Date.now())));
     if (this.dirty && time - this.lastRender > RENDER_EVERY_MS) {
       this.dirty = false;
       this.lastRender = time;
