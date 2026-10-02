@@ -12,7 +12,8 @@ import { setupDebug } from '../debug';
 import { GameState, type Viewer } from '../game/state';
 import { connectTwitch } from '../twitch/connect';
 import { users } from '../twitch/users';
-import { avatarKey, fallbackKey, loadAvatar } from '../twitch/avatars';
+import { avatarKey, fallbackKey, loadAvatar, clearBallTextures } from '../twitch/avatars';
+import { THEMES } from '../themes/index';
 import { Juice, type Pulse } from './fx';
 
 type Body = MatterJS.BodyType;
@@ -53,6 +54,7 @@ export class Game extends Phaser.Scene {
   private loading = false;
   private pendingAvatars = new Set<string>();
   private paused = false;
+  private forcedTheme?: string; // debug : touche T
   private fx = new Juice(this);
   private mapTweens: Phaser.Tweens.Tween[] = [];
   private frame = 0; // !pachinko stop : le podium reste affiché jusqu'à !pachinko start
@@ -81,6 +83,13 @@ export class Game extends Phaser.Scene {
     this.game.registry.set('paused', this.paused);
   }
 
+  /** Debug (touche T) : thème suivant du registre, par le même chemin qu'un changement entre parties. */
+  nextTheme() {
+    const ids = Object.keys(THEMES);
+    this.forcedTheme = ids[(ids.indexOf(this.theme?.id ?? 'base') + 1) % ids.length];
+    void this.newGame();
+  }
+
   /** Nouvelle partie : billes et carte détruites AVANT un éventuel changement de textures. */
   async newGame(seed = Math.floor(Math.random() * 1e9)) {
     if (this.loading) return; // ex. !pachinko skip spammé pendant un changement de thème
@@ -97,8 +106,15 @@ export class Game extends Phaser.Scene {
     for (const ball of [...this.balls.values()]) this.removeBall(ball);
     this.toRemove.length = 0;
     this.clearMap();
-    const theme = resolveTheme(todayMMDD(params.date), params.theme);
+    const theme = resolveTheme(todayMMDD(params.date), this.forcedTheme ?? params.theme);
     if (theme.id !== this.theme?.id) {
+      // tout ce qui affiche une texture du thème disparaît AVANT que les textures soient remplacées
+      this.game.events.emit('theme-unload');
+      this.fx.clear();
+      if ((theme.palette.ballRim ?? null) !== (this.theme?.palette.ballRim ?? null)) {
+        clearBallTextures(this);
+        this.pendingAvatars.clear();
+      }
       this.theme = theme;
       await applyTheme(this, theme);
       this.fx.rebuild(theme);
@@ -155,7 +171,7 @@ export class Game extends Phaser.Scene {
       const img = this.track(this.add.image(b.x, b.y, 'bumper').setDisplaySize(b.radius * 2, b.radius * 2));
       this.glow(img, pal.bumperCore, 3, 6);
       // cœur de l'ampoule qui s'allume au contact
-      const glow = this.track(this.add.image(b.x, b.y, 'fx-hit').setDisplaySize(b.radius * 2.4, b.radius * 2.4)
+      const glow = this.track(this.add.image(b.x, b.y, 'fx-glow').setDisplaySize(b.radius * 2.4, b.radius * 2.4)
         .setBlendMode('ADD').setTint(hex(pal.bumperCore)).setAlpha(0));
       this.els.set(body.id, { kind: 'bumper', points: PTS_BUMPER, pulse: { kind: 'bumper', v: 0, img, size: b.radius * 2, glow } });
     }
@@ -225,7 +241,7 @@ export class Game extends Phaser.Scene {
     });
     this.matter.body.setVelocity(body, { x: Phaser.Math.FloatBetween(-0.6, 0.6), y: 0 });
     const hasAvatar = this.textures.exists(avatarKey(viewer.id));
-    const key = hasAvatar ? avatarKey(viewer.id) : fallbackKey(this, viewer, this.theme.font.family);
+    const key = hasAvatar ? avatarKey(viewer.id) : fallbackKey(this, viewer, this.theme.font.family, this.theme.palette.ballRim);
     if (!hasAvatar) this.fetchIdentity(viewer);
     const img = this.add.image(bx, y, key).setDisplaySize(BALL_R * 2, BALL_R * 2);
     const ball: Ball = {
@@ -247,7 +263,7 @@ export class Game extends Phaser.Scene {
           this.state.rename(viewer.id, info.name);
           this.game.events.emit('player', viewer.id);
         }
-        return info.avatar ? loadAvatar(this, viewer, info.avatar) : false;
+        return info.avatar ? loadAvatar(this, viewer, info.avatar, this.theme.palette.ballRim) : false;
       })
       .then((ok) => {
         this.pendingAvatars.delete(viewer.id);

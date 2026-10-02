@@ -2,6 +2,7 @@
 import Phaser from 'phaser';
 import type { Theme, SpriteSource, DrawFn } from './types';
 import * as D from './draw';
+import { KANJI_FONT } from './base';
 import { PEG_R, BUMPER_R, SPINNER_R, BALL_R, RAMP_THICK, BOARD_W, HEIGHT } from '../config';
 
 export const TEX_SCALE = 2; // textures dessinées à 2× puis réduites (net en 1080p)
@@ -20,6 +21,8 @@ const SIZES: Record<string, [number, number]> = {
   'fx-bin': [32, 32],
   'fx-confetti': [32, 32],
   'fx-ring': [128, 128],
+  'fx-glow': [32, 32], // lumière (ampoules, halos, traînées) : jamais remplacée par un thème
+  ambient: [48, 48],
 };
 
 const DEFAULTS: Record<string, DrawFn> = {
@@ -35,6 +38,8 @@ const DEFAULTS: Record<string, DrawFn> = {
   'fx-bin': D.drawSpark,
   'fx-confetti': D.drawConfetti,
   'fx-ring': D.drawRing,
+  'fx-glow': D.drawSpark,
+  ambient: D.drawSpark,
 };
 
 export async function applyTheme(scene: Phaser.Scene, theme: Theme): Promise<void> {
@@ -44,6 +49,7 @@ export async function applyTheme(scene: Phaser.Scene, theme: Theme): Promise<voi
     'fx-bumper': theme.particles.bumper,
     'fx-bin': theme.particles.bin,
     'fx-confetti': theme.particles.confetti,
+    ambient: theme.ambient?.sprite,
   };
   const images: [string, string][] = [];
   for (const [key, [w, h]] of Object.entries(SIZES)) {
@@ -66,7 +72,7 @@ export async function applyTheme(scene: Phaser.Scene, theme: Theme): Promise<voi
       scene.load.start();
     });
   }
-  await loadFont(theme.font.family, theme.font.url);
+  await Promise.all([loadFont(theme.font.family, theme.font.url), loadFont(KANJI_FONT.family, KANJI_FONT.url)]);
   makeDigits(scene, theme.font.family);
 }
 

@@ -44,7 +44,7 @@ terminée et vérifiée.
 - [x] 6. Tchat IRC + Heat
 - [x] 7. Utilisateurs et avatars
 - [x] 8. Juice + direction artistique de base (marquee, pop-ups, particules, glow, shake, animations)
-- [ ] 9. Thèmes saisonniers (Halloween, Hiver, Noël, Sakura, Plage)
+- [x] 9. Thèmes saisonniers (Halloween, Hiver, Noël, Sakura, Plage)
 - [ ] 10. Les 4 autres patterns de génération
 - [ ] 11. Passe perf et réglages finaux
 
@@ -530,7 +530,7 @@ FPS visible ; les pop-ups sont en Dela Gothic One dès le premier lancement (cac
 Spec thèmes §5. Chaque thème = `src/themes/<id>.ts` exportant un `ThemeDef` partiel ; tous les
 sprites sont des `DrawFn` dans `draw.ts`.
 
-- [ ] Étendre `resolve.test.ts` avec le **vrai** registre (test qui échoue tant que les thèmes
+- [x] Étendre `resolve.test.ts` avec le **vrai** registre (test qui échoue tant que les thèmes
       n'existent pas) :
 ```ts
 import { THEMES } from './index';
@@ -551,22 +551,22 @@ describe('registre réel', () => {
   });
 });
 ```
-- [ ] `npx vitest run src/themes` → **échec attendu** (thèmes absents du registre).
-- [ ] `draw.ts` : `drawPumpkin`, `drawCandy`, `drawBat`, `drawSnowflake`, `drawChristmasBall`,
+- [x] `npx vitest run src/themes` → **échec attendu** (thèmes absents du registre).
+- [x] `draw.ts` : `drawPumpkin`, `drawCandy`, `drawBat`, `drawSnowflake`, `drawChristmasBall`,
       `drawStar`, `drawSakuraFlower`, `drawPetal`, `drawBubble`, `drawDrop`, `drawShell`,
       `drawStarfish`, `drawBuoy` (formes simples + dégradés, cohérentes avec le rendu métallique).
-- [ ] `halloween.ts` (`10-15 → 11-01`), `hiver.ts` (`12-01 → 02-29`, priorité 1),
+- [x] `halloween.ts` (`10-15 → 11-01`), `hiver.ts` (`12-01 → 02-29`, priorité 1),
       `noel.ts` (`extends: 'hiver'`, `12-01 → 12-26`, priorité 2), `sakura.ts` (`03-20 → 04-30`),
       `plage.ts` (`07-01 → 08-31`) : palette, `sprites`, `particles`, `ambient`, `font`, `texts`
       exactement selon le tableau §5 de la spec. Ajouter au registre `index.ts`.
-- [ ] Polices woff2 dans `public/fonts/` : Creepster, Mountains of Christmas, Lilita One (OFL).
-- [ ] `npm run test` → vert.
-- [ ] Ambiance dans `scenes/Backdrop.ts` : un émetteur avec la texture `ambient`, `count` ≤ 60,
+- [x] Polices woff2 dans `public/fonts/` : Creepster, Mountains of Christmas, Lilita One (OFL).
+- [x] `npm run test` → vert.
+- [x] Ambiance dans `scenes/Backdrop.ts` : un émetteur avec la texture `ambient`, `count` ≤ 60,
       direction `down` / `up` / `across`, `drift` (oscillation X), `spin` (rotation), alpha ≈ 0.5.
       Recréé quand le thème change.
-- [ ] `apply.ts` : générer aussi la texture `ambient` quand `theme.ambient` existe ; si
+- [x] `apply.ts` : générer aussi la texture `ambient` quand `theme.ambient` existe ; si
       `palette.ballRim` est défini, supprimer les textures `avatar-*` (elles seront recréées avec ce liseré).
-- [ ] Debug : touche **T** = thème suivant du registre (même chemin que le changement entre parties :
+- [x] Debug : touche **T** = thème suivant du registre (même chemin que le changement entre parties :
       destruction → `applyTheme` → reconstruction).
 
 ⚠️ Vigilance
@@ -580,7 +580,7 @@ describe('registre réel', () => {
 - Lisibilité : vérifier sur chaque thème que les billes chromées et les pop-ups restent bien
   contrastés sur le nouveau fond.
 
-- [ ] **Vérif (étape terminée)** : `npm run test` vert ; `?date=2026-10-31`, `?date=2026-12-15`,
+- [x] **Vérif (étape terminée)** : `npm run test` vert ; `?date=2026-10-31`, `?date=2026-12-15`,
 `?date=2026-01-15`, `?date=2026-04-01`, `?date=2026-08-01` affichent respectivement Halloween, Noël,
 Hiver, Sakura, Plage ; la touche T fait défiler les 6 thèmes 20 fois de suite sans texture manquante
 ni hausse continue de la mémoire (onglet Memory de Chrome).

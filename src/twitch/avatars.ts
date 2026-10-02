@@ -10,6 +10,12 @@ const R = SIZE / 2;
 
 export const avatarKey = (id: string) => `avatar-${id}`;
 
+/** Liseré imposé par un thème : les billes déjà dessinées doivent être refaites. */
+export function clearBallTextures(scene: Phaser.Scene) {
+  for (const key of scene.textures.getTextureKeys())
+    if (key.startsWith('avatar-') || key.startsWith('fb-')) scene.textures.remove(key);
+}
+
 function newCanvas() {
   const c = document.createElement('canvas');
   c.width = c.height = SIZE;
@@ -33,7 +39,7 @@ function put(scene: Phaser.Scene, key: string, c: HTMLCanvasElement) {
 }
 
 /** Bille de repli immédiate : couleur du viewer + initiale. */
-export function fallbackKey(scene: Phaser.Scene, v: Viewer, font: string): string {
+export function fallbackKey(scene: Phaser.Scene, v: Viewer, font: string, rim?: string | null): string {
   const key = `fb-${v.id}`;
   if (scene.textures.exists(key)) return key;
   const { c, ctx } = newCanvas();
@@ -46,13 +52,13 @@ export function fallbackKey(scene: Phaser.Scene, v: Viewer, font: string): strin
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText((v.name.trim()[0] ?? '?').toUpperCase(), R, R * 1.08);
-  finish(ctx, '#d8dde6');
+  finish(ctx, rim ?? '#d8dde6');
   put(scene, key, c);
   return key;
 }
 
 /** Charge l'avatar Twitch (CDN avec CORS) et l'enregistre sous avatar-<id>. false si indisponible. */
-export function loadAvatar(scene: Phaser.Scene, v: Viewer, url: string): Promise<boolean> {
+export function loadAvatar(scene: Phaser.Scene, v: Viewer, url: string, rim?: string | null): Promise<boolean> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous'; // sinon canvas « tainted » et texture WebGL refusée
@@ -64,7 +70,7 @@ export function loadAvatar(scene: Phaser.Scene, v: Viewer, url: string): Promise
       ctx.clip();
       ctx.drawImage(img, 0, 0, SIZE, SIZE);
       ctx.restore();
-      finish(ctx, v.color);
+      finish(ctx, rim ?? v.color);
       put(scene, avatarKey(v.id), c);
       resolve(true);
     };

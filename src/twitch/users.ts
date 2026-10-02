@@ -59,9 +59,9 @@ export class UserDirectory {
 
 /** Couleur stable dérivée de l'id (viewers sans couleur de tchat). */
 export function colorFor(id: string): string {
-  let h = 0;
-  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  const hue = h % 360, s = 0.65, l = 0.6;
+  let h = 2166136261; // FNV-1a : un caractère de différence change tout le hash
+  for (const ch of id) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  const hue = (h * 137.508) % 360, s = 0.65, l = 0.6; // angle d'or : teintes bien réparties
   const f = (n: number) => {
     const k = (n + hue / 30) % 12;
     const c = l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));

@@ -1,2 +1,3 @@
 Polices issues de Google Fonts, sous licence SIL Open Font License 1.1 (https://openfontlicense.org).
 DelaGothicOne-Regular.woff2 : sous-ensemble (latin + quelques kana/kanji) via fonts.googleapis.com ?text=
+Creepster-Regular, MountainsOfChristmas-Bold, LilitaOne-Regular : sous-ensembles latin via fonts.googleapis.com ?text=

@@ -49,13 +49,23 @@ export class Juice {
 
   constructor(private scene: Phaser.Scene) {}
 
+  /** Détruit tout ce qui référence les textures du thème (avant leur remplacement). */
+  clear() {
+    for (const o of [...this.popups.map((p) => p.t), ...this.rings.map((r) => r.img), ...this.labels.map((l) => l.t), ...this.bulbs, ...this.emitters]) o.destroy();
+    this.popups = [];
+    this.rings = [];
+    this.labels = [];
+    this.bulbs = [];
+    this.emitters = [];
+    this.pulses.clear();
+  }
+
   /** (Re)crée tout ce qui dépend des textures et couleurs du thème. */
   rebuild(theme: Theme) {
     const s = this.scene, pal = theme.palette;
-    for (const o of [...this.popups.map((p) => p.t), ...this.rings.map((r) => r.img), ...this.labels.map((l) => l.t), ...this.bulbs, ...this.emitters]) o.destroy();
-    this.pulses.clear();
+    this.clear();
 
-    this.trail = s.add.particles(0, 0, 'fx-hit', {
+    this.trail = s.add.particles(0, 0, 'fx-glow', {
       lifespan: 260, scale: { start: 0.42, end: 0 }, alpha: { start: 0.3, end: 0 },
       blendMode: 'ADD', emitting: false, maxParticles: 900, tint: hex(pal.text),
     }).setDepth(5);
@@ -100,7 +110,7 @@ export class Juice {
     const down = Array.from({ length: BULBS_PER_SIDE }, (_, i) => 30 + (i * (HEIGHT - 60)) / (BULBS_PER_SIDE - 1));
     const up = [...down].reverse();
     const spots = [...up.map((y) => [WALL / 2, y]), ...down.map((y) => [BOARD_W - WALL / 2, y])];
-    this.bulbs = spots.map(([x, y]) => s.add.image(x, y, 'fx-hit').setScale(0.7).setBlendMode('ADD').setDepth(6));
+    this.bulbs = spots.map(([x, y]) => s.add.image(x, y, 'fx-glow').setScale(0.7).setBlendMode('ADD').setDepth(6));
     this.wasFrenzy = true; // force la pose des teintes au premier update
   }
 

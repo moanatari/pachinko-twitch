@@ -78,4 +78,18 @@ describe('colorFor', () => {
     expect(colorFor('123')).toMatch(/^#[0-9a-f]{6}$/);
     expect(colorFor('123')).not.toBe(colorFor('456'));
   });
+
+  it('ids voisins → teintes bien distinctes', () => {
+    const hue = (c: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16) / 255);
+      const max = Math.max(r, g, b), d = max - Math.min(r, g, b);
+      const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    const hues = ['bot-1', 'bot-2', 'bot-3', '41234560', '41234561'].map((id) => hue(colorFor(id)));
+    for (let i = 1; i < hues.length; i++) {
+      const diff = Math.abs(hues[i] - hues[i - 1]);
+      expect(Math.min(diff, 360 - diff)).toBeGreaterThan(25);
+    }
+  });
 });

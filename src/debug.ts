@@ -3,7 +3,7 @@ import { params, BOARD_W, WALL } from './config';
 import type { Game } from './scenes/Game';
 import { colorFor } from './twitch/users';
 
-/** ?debug=1 : clic = drop d'un faux viewer, touche B = +10 bots, compteurs FPS / billes / points. */
+/** ?debug=1 : clic = drop d'un faux viewer, touche B = +10 bots, T = thème suivant, compteurs FPS / billes / points. */
 export function setupDebug(scene: Game) {
   if (!params.debug) return;
   let clicks = 0;
@@ -14,6 +14,7 @@ export function setupDebug(scene: Game) {
 
   let bots = params.bots;
   scene.input.keyboard?.on('keydown-B', () => { bots += 10; });
+  scene.input.keyboard?.on('keydown-T', () => scene.nextTheme());
   // chaque bot relance dès que sa bille est terminée
   scene.time.addEvent({
     delay: 120, loop: true, callback: () => {

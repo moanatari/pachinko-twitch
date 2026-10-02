@@ -184,3 +184,242 @@ export const drawConfetti: DrawFn = (ctx, w, h, p) => {
   ctx.fillStyle = p.accent;
   ctx.fillRect(w * 0.2, h * 0.35, w * 0.6, h * 0.3);
 };
+
+// --- Sprites saisonniers (v1 : dessinés en code ; remplaçables par une image sans toucher au reste) ---
+// Les sprites de particules sont clairs : les émetteurs les teintent.
+
+const starPath = (ctx: Ctx, cx: number, cy: number, spikes: number, outer: number, inner: number) => {
+  ctx.beginPath();
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 ? inner : outer;
+    const a = -Math.PI / 2 + (i * Math.PI) / spikes;
+    ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+  }
+  ctx.closePath();
+};
+
+/** Citrouille (bumper Halloween) : tient dans le cercle de la hitbox. */
+export const drawPumpkin: DrawFn = (ctx, w, _h, p) => {
+  const r = w / 2;
+  const g = ctx.createRadialGradient(r * 0.8, r * 0.75, r * 0.1, r, r, r);
+  g.addColorStop(0, '#ffd08a');
+  g.addColorStop(0.45, p.bumperCore);
+  g.addColorStop(1, '#4a1600');
+  ctx.fillStyle = g;
+  for (const [dx, rx] of [[-0.42, 0.52], [0.42, 0.52], [0, 0.6]]) {
+    ctx.beginPath();
+    ctx.ellipse(r + dx * r, r * 1.08, r * rx, r * 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(60,20,0,0.45)';
+  ctx.lineWidth = w * 0.02;
+  for (const dx of [-0.24, 0.24]) {
+    ctx.beginPath();
+    ctx.ellipse(r + dx * r, r * 1.08, r * 0.22, r * 0.76, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#4a6b2a';
+  ctx.fillRect(r - w * 0.05, r * 0.12, w * 0.1, r * 0.3);
+  ctx.fillStyle = '#ffe066'; // visage, éclairé par le halo additif au contact
+  for (const sx of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(r + sx * r * 0.42, r * 1.0);
+    ctx.lineTo(r + sx * r * 0.18, r * 1.0);
+    ctx.lineTo(r + sx * r * 0.3, r * 0.76);
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.moveTo(r - r * 0.45, r * 1.22);
+  for (let i = 1; i <= 6; i++) ctx.lineTo(r - r * 0.45 + (i * r * 0.9) / 6, r * (i % 2 ? 1.42 : 1.26));
+  ctx.lineTo(r + r * 0.45, r * 1.22);
+  ctx.closePath();
+  ctx.fill();
+};
+
+/** Bonbon emballé (taquet doré Halloween, particules). */
+export const drawCandy: DrawFn = (ctx, w, h, p) => {
+  const cx = w / 2, cy = h / 2, r = w * 0.26;
+  ctx.fillStyle = p.pegGolden;
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + s * r * 0.8, cy);
+    ctx.lineTo(cx + s * w * 0.48, cy - r * 0.9);
+    ctx.lineTo(cx + s * w * 0.48, cy + r * 0.9);
+    ctx.fill();
+  }
+  disc(ctx, cx, cy, r);
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = w * 0.06;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.clip();
+  for (let i = -2; i <= 2; i++) {
+    ctx.beginPath();
+    ctx.moveTo(cx + i * r * 0.7 - r, cy - r);
+    ctx.lineTo(cx + i * r * 0.7 + r, cy + r);
+    ctx.stroke();
+  }
+  ctx.restore();
+};
+
+/** Chauve-souris (ambiance Halloween). */
+export const drawBat: DrawFn = (ctx, w, h) => {
+  const cx = w / 2, cy = h / 2;
+  ctx.fillStyle = '#3b2458';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - h * 0.08);
+  for (const s of [1, -1]) {
+    ctx.lineTo(cx + s * w * 0.2, cy - h * 0.2);
+    ctx.lineTo(cx + s * w * 0.48, cy - h * 0.12);
+    ctx.lineTo(cx + s * w * 0.4, cy + h * 0.06);
+    ctx.lineTo(cx + s * w * 0.3, cy);
+    ctx.lineTo(cx + s * w * 0.2, cy + h * 0.1);
+    ctx.lineTo(cx + s * w * 0.08, cy + h * 0.04);
+    ctx.lineTo(cx, cy + h * 0.16);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ff9a1f';
+  disc(ctx, cx - w * 0.035, cy - h * 0.02, w * 0.02);
+  disc(ctx, cx + w * 0.035, cy - h * 0.02, w * 0.02);
+};
+
+/** Flocon (ambiance et particules Hiver). */
+export const drawSnowflake: DrawFn = (ctx, w, h) => {
+  const cx = w / 2, cy = h / 2, r = w * 0.44;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = w * 0.07;
+  for (let i = 0; i < 6; i++) {
+    const a = (i * Math.PI) / 3;
+    const x = Math.cos(a), y = Math.sin(a);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + x * r, cy + y * r);
+    for (const s of [-1, 1]) {
+      const b = a + s * 0.6;
+      ctx.moveTo(cx + x * r * 0.55, cy + y * r * 0.55);
+      ctx.lineTo(cx + x * r * 0.55 + Math.cos(b) * r * 0.3, cy + y * r * 0.55 + Math.sin(b) * r * 0.3);
+    }
+    ctx.stroke();
+  }
+};
+
+/** Boule de Noël (taquet doré Noël). */
+export const drawChristmasBall: DrawFn = (ctx, w, _h, p) => {
+  const r = w / 2;
+  const g = ctx.createRadialGradient(r * 0.7, r * 0.75, r * 0.05, r, r * 1.1, r * 0.8);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.3, p.pegGolden);
+  g.addColorStop(1, '#3a0006');
+  ctx.fillStyle = g;
+  disc(ctx, r, r * 1.12, r * 0.8);
+  ctx.fillStyle = '#e8c45a';
+  ctx.fillRect(r - w * 0.12, r * 0.18, w * 0.24, r * 0.22);
+};
+
+/** Étoile (particules Noël). */
+export const drawStar: DrawFn = (ctx, w, h) => {
+  ctx.fillStyle = '#fff5cc';
+  starPath(ctx, w / 2, h / 2, 5, w * 0.46, w * 0.2);
+  ctx.fill();
+};
+
+/** Fleur de cerisier (taquet doré Sakura). */
+export const drawSakuraFlower: DrawFn = (ctx, w, h, p) => {
+  const cx = w / 2, cy = h / 2;
+  ctx.fillStyle = p.pegGolden;
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+    ctx.beginPath();
+    ctx.ellipse(cx + Math.cos(a) * w * 0.25, cy + Math.sin(a) * w * 0.25, w * 0.2, w * 0.14, a, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = '#ffe27a';
+  disc(ctx, cx, cy, w * 0.1);
+};
+
+/** Pétale (ambiance et particules Sakura). */
+export const drawPetal: DrawFn = (ctx, w, h) => {
+  const g = ctx.createLinearGradient(0, 0, w, h);
+  g.addColorStop(0, '#fff0f5');
+  g.addColorStop(1, '#ffb3cf');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(w / 2, h / 2, w * 0.42, h * 0.24, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+};
+
+/** Bulle (ambiance Plage). */
+export const drawBubble: DrawFn = (ctx, w, h) => {
+  ctx.strokeStyle = 'rgba(210,245,255,0.85)';
+  ctx.lineWidth = w * 0.07;
+  ctx.beginPath();
+  ctx.arc(w / 2, h / 2, w * 0.4, 0, Math.PI * 2);
+  ctx.stroke();
+  shine(ctx, w * 0.36, h * 0.34, w * 0.1, h * 0.05, 0.8);
+};
+
+/** Goutte (particules Plage). */
+export const drawDrop: DrawFn = (ctx, w, h) => {
+  ctx.fillStyle = '#eaf8ff';
+  ctx.beginPath();
+  ctx.moveTo(w / 2, h * 0.08);
+  ctx.quadraticCurveTo(w * 0.85, h * 0.6, w / 2, h * 0.9);
+  ctx.quadraticCurveTo(w * 0.15, h * 0.6, w / 2, h * 0.08);
+  ctx.fill();
+};
+
+/** Coquillage (particules Plage). */
+export const drawShell: DrawFn = (ctx, w, h) => {
+  const cx = w / 2, by = h * 0.82, r = w * 0.42;
+  ctx.fillStyle = '#fff1dc';
+  ctx.beginPath();
+  ctx.moveTo(cx, by);
+  ctx.arc(cx, by, r, Math.PI * 1.05, Math.PI * 1.95);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(180,130,90,0.6)';
+  ctx.lineWidth = w * 0.03;
+  for (let i = 1; i < 5; i++) {
+    const a = Math.PI * (1.05 + (i * 0.9) / 5);
+    ctx.beginPath();
+    ctx.moveTo(cx, by);
+    ctx.lineTo(cx + Math.cos(a) * r, by + Math.sin(a) * r);
+    ctx.stroke();
+  }
+};
+
+/** Étoile de mer à 4 bras (tourniquet Plage : mêmes bras que la croix physique). */
+export const drawStarfish: DrawFn = (ctx, w, _h, p) => {
+  const c = w / 2;
+  const g = ctx.createRadialGradient(c, c, 0, c, c, c);
+  g.addColorStop(0, '#ffd1a8');
+  g.addColorStop(0.5, p.spinner);
+  g.addColorStop(1, '#a8441e');
+  ctx.fillStyle = g;
+  starPath(ctx, c, c, 4, c * 0.98, c * 0.22);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,240,220,0.7)';
+  for (let i = 0; i < 4; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 2;
+    for (const k of [0.35, 0.55, 0.75]) disc(ctx, c + Math.cos(a) * c * k, c + Math.sin(a) * c * k, w * 0.018);
+  }
+};
+
+/** Bouée rouge et blanche (bumper Plage). */
+export const drawBuoy: DrawFn = (ctx, w, _h, p) => {
+  const r = w / 2;
+  for (let i = 0; i < 8; i++) {
+    ctx.fillStyle = i % 2 ? '#ffffff' : p.bumperCore;
+    ctx.beginPath();
+    ctx.moveTo(r, r);
+    ctx.arc(r, r, r * 0.96, (i * Math.PI) / 4, ((i + 1) * Math.PI) / 4);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = '#0b3440';
+  disc(ctx, r, r, r * 0.46);
+  shine(ctx, r * 0.62, r * 0.42, r * 0.22, r * 0.1, 0.5);
+};

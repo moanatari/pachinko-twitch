@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { resolveTheme, mergeTheme, todayMMDD } from './resolve';
 import type { ThemeDef } from './types';
+import { THEMES } from './index';
 
 const defs = {
   base:   { id: 'base', palette: { peg: '#a00', marquee: ['#fff'] }, ambient: null },
@@ -48,4 +49,23 @@ describe('todayMMDD', () => {
   it('lit ?date= valide', () => expect(todayMMDD('2026-12-15')).toBe('12-15'));
   it.each(['hier', '2026-13-40', '2026-1-5', ''])('ignore %j → date du jour', (p) =>
     expect(todayMMDD(p)).toMatch(/^\d\d-\d\d$/));
+});
+
+describe('registre réel', () => {
+  it.each([
+    ['10-31', 'halloween'], ['11-02', 'base'], ['12-15', 'noel'], ['12-30', 'hiver'],
+    ['01-15', 'hiver'], ['02-29', 'hiver'], ['03-25', 'sakura'], ['08-01', 'plage'], ['06-15', 'base'],
+  ])('%s → %s', (d, expected) => expect(resolveTheme(d, undefined, THEMES).id).toBe(expected));
+
+  it('noel hérite de la neige de hiver', () =>
+    expect(mergeTheme('noel', THEMES).ambient).toBe(mergeTheme('hiver', THEMES).ambient));
+
+  it.each(Object.keys(THEMES))('%s a une palette complète', (k) => {
+    const p = mergeTheme(k, THEMES).palette;
+    for (const key of Object.keys(THEMES.base.palette!))
+      expect(p[key as keyof typeof p], key).toBeDefined();
+  });
+
+  it.each(Object.keys(THEMES))('%s a une police auto-hébergée', (k) =>
+    expect(mergeTheme(k, THEMES).font.url).toMatch(/^fonts\/.+\.woff2$/));
 });

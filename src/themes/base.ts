@@ -1,5 +1,8 @@
 import type { ThemeDef } from './types';
 
+/** Police japonaise : toujours chargée (filigranes et titres en kanji, quel que soit le thème). */
+export const KANJI_FONT = { family: 'Dela Gothic One', url: 'fonts/DelaGothicOne-Regular.woff2' };
+
 // Pachinko japonais sobre et clinquant : laque sombre, laiton, chrome, rouge laqué.
 export const base: ThemeDef = {
   id: 'base',
@@ -22,6 +25,6 @@ export const base: ThemeDef = {
   sprites: {},
   particles: { hit: null, bumper: null, bin: null, confetti: null },
   ambient: null,
-  font: { family: 'Dela Gothic One', url: 'fonts/DelaGothicOne-Regular.woff2' },
+  font: KANJI_FONT,
   texts: { podiumTitle: '大当り', watermark: 'パチンコ' },
 };

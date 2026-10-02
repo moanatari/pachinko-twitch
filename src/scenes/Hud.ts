@@ -4,6 +4,9 @@ import type { GameState, Player } from '../game/state';
 import type { Theme } from '../themes/types';
 import { avatarKey } from '../twitch/avatars';
 import { NAME_FONT } from './fx';
+import { KANJI_FONT } from '../themes/base';
+
+const hasKanji = (s: string) => /[぀-ヿ一-鿿]/.test(s);
 
 const ROWS = 10;
 const ROW_H = 54;
@@ -56,6 +59,12 @@ export class Hud extends Phaser.Scene {
 
   create() {
     const ev = this.game.events;
+    ev.on('theme-unload', () => {
+      this.hidePodium();
+      this.ui?.destroy();
+      this.ui = this.timer = undefined;
+      this.lines = [];
+    });
     ev.on('theme', (t: Theme) => { this.theme = t; this.build(); });
     for (const e of ['score', 'drop', 'phase', 'player']) ev.on(e, () => { this.dirty = true; });
     ev.on('phase', (p: string) => (p === 'podium' ? this.showPodium() : this.hidePodium()));
@@ -83,7 +92,7 @@ export class Hud extends Phaser.Scene {
     ui.add(this.add.rectangle(x0, 0, 4, HEIGHT, hex(pal.frame)).setOrigin(0));
     if (t.texts.watermark) {
       ui.add(this.add.text(cx, HEIGHT / 2, t.texts.watermark.split('').join('\n'), {
-        fontFamily: font, fontSize: '170px', color: pal.accent, align: 'center', lineSpacing: -30,
+        fontFamily: KANJI_FONT.family, fontSize: '170px', color: pal.accent, align: 'center', lineSpacing: -30,
       }).setOrigin(0.5).setAlpha(0.06));
     }
     ui.add(this.add.text(cx, 34, 'PACHINKO', { fontFamily: font, fontSize: '40px', color: pal.accent }).setOrigin(0.5, 0));
@@ -169,9 +178,11 @@ export class Hud extends Phaser.Scene {
       rotate: { min: 0, max: 360 }, scale: { min: 0.6, max: 1.2 }, lifespan: 5000, frequency: 45, quantity: 2,
       tint: [hex(pal.accent), hex(pal.bumperCore), hex(pal.text)],
     }));
-    const title = this.add.text(BOARD_W / 2, 120, t.texts.podiumTitle, { fontFamily: font, fontSize: '120px', color: pal.accent }).setOrigin(0.5);
+    const titleFont = hasKanji(t.texts.podiumTitle) ? KANJI_FONT.family : font;
+    const title = this.add.text(BOARD_W / 2, 120, t.texts.podiumTitle, { fontFamily: titleFont, fontSize: '120px', color: pal.accent }).setOrigin(0.5);
     c.add(title);
-    this.tweens.add({ targets: title, scale: { from: 0.3, to: 1 }, duration: 600, ease: 'Back.easeOut' });
+    const fit = Math.min(1, (BOARD_W - 140) / title.width); // titres longs (« Les plus terrifiants »)
+    this.tweens.add({ targets: title, scale: { from: 0.3 * fit, to: fit }, duration: 600, ease: 'Back.easeOut' });
     c.add(this.add.text(BOARD_W / 2, 230, 'FIN DE PARTIE', { fontFamily: font, fontSize: '36px', color: pal.text }).setOrigin(0.5));
     this.podiumEmpty = this.add.text(BOARD_W / 2, 520, 'Personne n\'a joué…', { fontFamily: NAME_FONT, fontSize: '40px', color: pal.text }).setOrigin(0.5);
     c.add(this.podiumEmpty);
