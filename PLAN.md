@@ -37,7 +37,7 @@ Cocher ici **et** dans le détail de l'étape (section « Étapes d'implémentat
 terminée et vérifiée.
 
 - [x] 1. Scaffold Vite + TS + Phaser
-- [ ] 2. RNG seedé + générateur de carte (pattern Classique) + tests
+- [x] 2. RNG seedé + générateur de carte (pattern Classique) + tests
 - [ ] 3. Fondations des thèmes (thème de base) + scène Game : plateau, billes, bacs, scoring de base
 - [ ] 4. Rampes, tourniquets, bumpers + filet anti-blocage
 - [ ] 5. État de partie + HUD (timer, classement, podium, cycle)
@@ -199,14 +199,14 @@ Chaque étape se termine par sa vérification. Ne pas passer à la suivante tant
 - [x] **Vérif (étape terminée)** : `npm run dev` affiche le plateau vide sans erreur console ; `npm run build` passe.
 
 ### 2. RNG seedé + générateur de carte (pattern Classique) + tests
-- [ ] `src/rng.ts` : `mulberry32(seed)`, `range(min, max)`, `int(min, max)`, `pick(arr)`, `chance(p)`.
-- [ ] Types dans `mapgen.ts` : `Peg {x, y, golden}`, `Ramp {x, y, length, angle}`,
+- [x] `src/rng.ts` : `mulberry32(seed)`, `range(min, max)`, `int(min, max)`, `pick(arr)`, `chance(p)`.
+- [x] Types dans `mapgen.ts` : `Peg {x, y, golden}`, `Ramp {x, y, length, angle}`,
       `Spinner {x, y, radius, speed}`, `Bumper {x, y, radius}`, `Bin {x, width, points}`, `MapData`.
-- [ ] `generateMap(seed, bounds)` avec le pattern Classique : quinconce, quelques trous, 2–4 bumpers,
+- [x] `generateMap(seed, bounds)` avec le pattern Classique : quinconce, quelques trous, 2–4 bumpers,
       taquets dorés rares, bacs (valeurs plus hautes sur les bords).
-- [ ] Fonction `validateMap(map, bounds)` exportée (réutilisée par les tests et par un `console.warn`
+- [x] Fonction `validateMap(map, bounds)` exportée (réutilisée par les tests et par un `console.warn`
       en debug).
-- [ ] `mapgen.test.ts` : 1000 seeds → `validateMap` OK, et même seed → carte identique.
+- [x] `mapgen.test.ts` : 1000 seeds → `validateMap` OK, et même seed → carte identique.
 
 ⚠️ Vigilance
 - **Aucun import Phaser** dans `mapgen.ts` ou `rng.ts`, sinon vitest doit charger Phaser (lent, et
@@ -216,7 +216,7 @@ Chaque étape se termine par sa vérification. Ne pas passer à la suivante tant
   (rayon de balayage complet), pas seulement les centres.
 - Garder des taquets près des murs latéraux, sinon les billes tombent droit le long des bords.
 
-- [ ] **Vérif (étape terminée)** : `npm run test` vert.
+- [x] **Vérif (étape terminée)** : `npm run test` vert.
 
 ### 3. Fondations des thèmes (thème de base) + scène Game : plateau, billes, bacs, scoring de base
 
