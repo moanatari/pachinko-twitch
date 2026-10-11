@@ -7,19 +7,9 @@ procédurale différente à chaque partie.
 
 Aucun backend, aucun token Twitch : le tchat est lu en anonyme.
 
-## Prérequis
-
-- Node.js 22 ou plus récent
-- Chrome ou Firefox
-
 ## Lancer le jeu (sans Twitch)
 
-```bash
-npm install
-npm run dev
-```
-
-Ouvrir <http://localhost:5173/>.
+Ouvrir <https://moanatari.github.io/pachinko-twitch/> dans Chrome ou Firefox : rien à installer.
 
 Au premier lancement, le menu s'ouvre sur l'onglet **Réglages** et demande ta chaîne Twitch. Le jeu tourne
 déjà : ferme le menu avec **Échap** et clique sur le plateau. Chaque clic lâche ta bille (une seule à la
@@ -27,7 +17,7 @@ fois, comme pour les viewers).
 
 ### Mode debug
 
-Ouvrir <http://localhost:5173/?debug=1> :
+Ajouter `?debug=1` à l'adresse du jeu :
 
 | Touche / paramètre | Effet |
 |---|---|
@@ -54,6 +44,8 @@ Les réglages du menu peuvent aussi être passés dans l'URL pour une session (i
 sauvegardés) : `channel`, `duration` (minutes), `maxBalls`, `shake=0`, `autoNext=0`,
 `specialEvery` (secondes entre deux taquets spéciaux, `0` = aucun), `specialEffects` (effets activés,
 ex. `moon,warp` ; ids : `double`, `moon`, `warp`, `slow`, `x2`, `gold`, `quake`).
+L'onglet Réglages du menu donne ce lien tout prêt (« Copier le lien ») avec tous les réglages en cours :
+pratique pour une source navigateur OBS, où le menu n'est pas cliquable.
 
 ### Chrono, top du mois, taquets spéciaux
 
@@ -86,12 +78,23 @@ ex. `moon,warp` ; ids : `double`, `moon`, `warp`, `slow`, `x2`, `gold`, `quake`)
 
 Réglages, exclusions et historique sont gardés dans le `localStorage` du navigateur.
 
+## Développement en local
+
+Il faut Node.js 22 ou plus récent.
+
+```bash
+npm install
+npm run dev        # sert le jeu sur http://localhost:5173/
+```
+
 ## Build
 
 ```bash
 npm run build      # build statique dans dist/
 npm run preview    # sert dist/ en local
 ```
+
+Chaque push sur `main` build et publie `dist/` sur GitHub Pages (`.github/workflows/pages.yml`).
 
 ## Tests
 
