@@ -141,5 +141,15 @@ await page.click('[data-tab=players]');
 const opened = await fps();
 check('150 billes : FPS menu fermé / ouvert', opened >= closed * 0.9, `${closed} / ${opened} fps (${await page.evaluate(`${G}.ballCount`)} billes)`);
 
+// 6 bis. Changement de thème pendant une pluie d'or : textures remplacées sans erreur
+await page.evaluate(`${S}.apply('gold', [...${G}.balls.values()][0])`);
+const goldOn = await page.evaluate(`${S}.gold`);
+const themeBefore = await page.evaluate(`${G}.theme.id`);
+await page.evaluate(`${G}.nextTheme()`);
+await page.waitForFunction(`${G}.theme.id !== '${themeBefore}' && !!${G}.map`);
+await page.waitForTimeout(1000);
+check('changement de thème pendant une pluie d\'or', goldOn && !(await page.evaluate(`${S}.gold`)),
+  `${themeBefore} → ${await page.evaluate(`${G}.theme.id`)}`);
+
 check('aucune erreur JS', errors.length === 0, errors.join(' | '));
 await browser.close();

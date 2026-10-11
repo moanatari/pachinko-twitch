@@ -50,7 +50,7 @@ terminée et vérifiée.
 - [x] 12. Mode streamer : plein écran, menus, modération, historique (spec `docs/superpowers/specs/2026-10-02-streamer-mode-design.md`, plan `docs/superpowers/plans/2026-10-02-streamer-mode.md`)
 - [x] 13. Timer à la première bille (spec `docs/superpowers/specs/2026-10-11-timer-top-du-mois-taquets-speciaux-design.md`, plan `docs/superpowers/plans/2026-10-11-timer-top-du-mois-taquets-speciaux.md`)
 - [x] 14. Top du mois (même spec, même plan)
-- [x] 15. Taquets spéciaux (même spec, même plan)
+- [ ] 15. Taquets spéciaux (même spec, même plan)
 
 ## Décisions prises
 | Sujet | Choix |
@@ -654,7 +654,7 @@ ni hausse continue de la mémoire (onglet Memory de Chrome).
 - [x] Réglages `specialEvery` / `specialEffects` (menu + URL).
 - [x] `src/game/specials.ts` (catalogue + tirage, pur) et `src/scenes/specials.ts` (taquet allumé, 7 effets).
 - [x] Texture `pegSpecial` (clé fixe, teintable).
-- [x] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps à `?debug=1&bots=150` ; les 7 effets vus à la main.
+- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps à `?debug=1&bots=150` ; les 7 effets vus à la main.
 
 ## Vérification
 - `npm run test` : `mapgen.test.ts` (1000 seeds × 5 patterns respectent les règles),
