@@ -55,6 +55,17 @@ sauvegardés) : `channel`, `duration` (minutes), `maxBalls`, `shake=0`, `autoNex
 `specialEvery` (secondes entre deux taquets spéciaux, `0` = aucun), `specialEffects` (effets activés,
 ex. `moon,warp` ; ids : `double`, `moon`, `warp`, `slow`, `x2`, `gold`, `quake`).
 
+### Chrono, top du mois, taquets spéciaux
+
+- **Chrono** : il démarre à la première bille. Tant que personne ne joue, le jeu attend sur la même carte.
+- **Top du mois** : le meilleur score de chaque viewer sur le mois calendaire, affiché dans le panneau
+  latéral pendant le podium et l'attente. Il est gardé dans le `localStorage` du navigateur (donc lié au
+  navigateur et au profil utilisés pour le stream). Les viewers Heat anonymes ne sont pas classés, et rien
+  n'est enregistré avec `?debug=1`.
+- **Taquets spéciaux** : de temps en temps un taquet s'allume et déclenche un effet au premier contact.
+  L'intervalle et les effets (une case par effet) se règlent dans l'onglet **Réglages** du menu. Pour
+  essayer un effet : `?debug=1&bots=40&specialEvery=3&specialEffects=<id>`.
+
 ## Jouer avec Twitch
 
 1. Dans le menu (**Échap** ou roue crantée en bas à droite) → **Réglages** → saisir le login de la chaîne
@@ -96,5 +107,6 @@ de la chaîne de test `pachinko_test` en lecture anonyme.
 ## Pour aller plus loin
 
 - `PLAN.md` : design complet et avancement.
-- `docs/superpowers/specs/` : spec des thèmes et du mode streamer.
+- `docs/superpowers/specs/` : spec des thèmes, du mode streamer, et du chrono / top du mois / taquets spéciaux
+  (`2026-10-11-timer-top-du-mois-taquets-speciaux-design.md`).
 - `CLAUDE.md` : architecture et règles du projet.

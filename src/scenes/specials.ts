@@ -3,7 +3,7 @@
 import Phaser from 'phaser';
 import {
   params, BOARD_W, WALL, BALL_R, GRAVITY_Y, SPECIAL_TTL_MS, MOON_GRAVITY, MOON_MS, SLOW_SCALE, SLOW_MS,
-  X2_MS, GOLD_MS, QUAKE_KICK,
+  X2_MS, GOLD_MS, QUAKE_KICK, PEG_R,
 } from '../config';
 import { EFFECTS, pickEffect, type EffectId } from '../game/specials';
 import type { Game, Ball, PegRt } from './Game';
@@ -68,7 +68,7 @@ export class Specials {
     } else if (id === 'x2') this.x2.set(ball.userId, X2_MS);
     else if (id === 'gold') {
       this.goldMs = GOLD_MS;
-      for (const p of g.pegs) p.img.setTexture('pegGolden');
+      for (const p of g.pegs) p.img.setTexture('pegGolden').setDisplaySize(PEG_R * 2, PEG_R * 2);
     } else {
       for (const b of g.balls.values()) {
         body.setVelocity(b.body, {
@@ -140,6 +140,6 @@ export class Specials {
 
   private endGold() {
     this.goldMs = 0;
-    for (const p of this.game.pegs) p.img.setTexture('peg');
+    for (const p of this.game.pegs) p.img.setTexture('peg').setDisplaySize(PEG_R * 2, PEG_R * 2);
   }
 }

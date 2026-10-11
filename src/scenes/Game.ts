@@ -106,6 +106,7 @@ export class Game extends Phaser.Scene {
   /** room-id reçu du tchat : nom et avatar résolus par users.resolve au premier drop. */
   setStreamer(roomId: string, login: string) {
     this.streamer = { id: roomId, name: login, color: colorFor(roomId) };
+    this.monthly.remove(STREAMER.id); // l'identité provisoire quitte le top du mois une fois la vraie connue
   }
 
   /** Identité courante ou provisoire (clics avant le room-id) : jamais excluable. */
@@ -134,6 +135,7 @@ export class Game extends Phaser.Scene {
         this.bans.add({ id, name: this.state.players.get(id)?.name ?? users.get(id)?.name ?? id, at: Date.now() });
         this.state.remove(id);
         this.monthly.remove(id);
+        this.warmMonthly();
       }
     }
     this.game.events.emit('player', id);
@@ -149,7 +151,11 @@ export class Game extends Phaser.Scene {
       theme: this.theme.id, players: s.players.size,
       top3: s.top(3).map(({ id, name, score }) => ({ id, name, score })),
     });
-    if (!params.debug) this.monthly.record(s.players.values(), Date.now()); // bots et parties de test hors du top
+    if (!params.debug) { // bots et parties de test hors du top
+      // identité provisoire du streamer : hors du top dès que le vrai id de chaîne est connu
+      const known = this.streamer.id !== STREAMER.id;
+      this.monthly.record([...s.players.values()].filter((p) => !known || p.id !== STREAMER.id), Date.now());
+    }
     this.game.events.emit('history');
   }
 

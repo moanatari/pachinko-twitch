@@ -35,8 +35,10 @@ check('premier lancement : message', (await page.textContent('.menu-notice')).in
 
 // 1 bis. Le streamer ne peut pas s'exclure, même sous son identité provisoire après l'arrivée du room-id
 check('drop du streamer provisoire', await page.evaluate(`${G}.requestDrop(${G}.streamer, 500)`));
+await page.evaluate(`${G}.monthly.record([${entry('streamer', 3)}], Date.now())`);
 await page.evaluate(`${G}.setStreamer('999', 'x'); ${G}.moderate('ban', 'streamer')`);
 check('streamer provisoire : non excluable', !(await page.evaluate(`${G}.bans.isBanned('streamer')`)));
+check('streamer provisoire : retiré du top du mois', !(await inMonthly(page, 'streamer')));
 
 // 2. Chaîne saisie → persistée après rechargement
 await page.fill('input[name=channel]', 'Pachinko_Test');
