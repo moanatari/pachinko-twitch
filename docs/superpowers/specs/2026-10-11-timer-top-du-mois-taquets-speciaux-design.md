@@ -124,8 +124,9 @@ Durées et forces dans `src/config.ts`.
   `extraBall(id)` ajoute la bille bonus sans compter une bille jouée de plus. `moderate('removeBall')`
   retire déjà toutes les billes du viewer.
 - Un effet déjà en cours qui est redéclenché repart pour sa durée complète (pas de cumul).
-- `slow` : une bille lâchée pendant l'effet n'est pas ralentie. Repose sur `body.timeScale` de Matter,
-  **à vérifier en premier** lors de l'implémentation ; repli : `frictionAir` élevé le temps de l'effet.
+- `slow` : une bille lâchée pendant l'effet n'est pas ralentie. Repose sur `body.timeScale` de Matter
+  (vérifié dans le Matter de Phaser 3.90 : `Body.update` multiplie le pas par `timeScale` et corrige la
+  vitesse au changement).
 - `warp` : l'ancre anti-blocage de la bille est réinitialisée.
 - `x2` et `gold` se cumulent (un taquet vaut alors 20 points pour le viewer). Le pop-up affiche les
   points réellement marqués.
@@ -146,9 +147,10 @@ Durées et forces dans `src/config.ts`.
 
 ### Visuel
 - Nouvelle texture à clé fixe `pegSpecial`, produite par `themes/apply.ts` (dessin neutre, teintable),
-  affichée à la place de l'image du taquet, teintée de la couleur de l'effet, avec un halo additif
-  pulsant (`fx-glow`, même mécanisme que les taquets dorés). **Même hitbox** : le corps physique n'est
-  pas touché.
+  posée **par-dessus** l'image du taquet, teintée de la couleur de l'effet, avec un halo additif pulsant
+  (`fx-glow`). L'image du taquet lui-même n'est pas modifiée : le flash de contact de `Juice` efface la
+  teinte d'un taquet, et la pluie d'or change sa texture. **Même hitbox** : le corps physique n'est pas
+  touché.
 - Aucune logique propre à un thème dans `scenes/` : les couleurs des effets viennent de `EFFECTS`.
 - Le texte d'annonce réutilise le pool d'étiquettes de `Juice`.
 
