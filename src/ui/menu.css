@@ -31,6 +31,7 @@
 .menu-tabs { display: flex; gap: 12px; margin-bottom: 20px; }
 .menu-tabs button { font-family: "Dela Gothic One", sans-serif; font-size: 24px; }
 .menu-tabs button.active { background: var(--frame); color: var(--bg); }
+.menu-close { margin-left: auto; }
 .menu-body { flex: 1; overflow-y: auto; }
 .menu-root h3 { font-family: "Dela Gothic One", sans-serif; font-weight: normal; color: var(--accent); margin: 24px 0 10px; }
 .menu-info { display: grid; grid-template-columns: max-content 1fr; gap: 6px 24px; margin: 0 0 24px; }

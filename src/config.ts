@@ -9,6 +9,7 @@ export interface Params extends Settings {
   bots: number;
   date: string | null;
   pattern: string | null;
+  menu: boolean; // `menu=0` : lien pour OBS, aucun menu (une source navigateur n'est pas cliquable)
 }
 
 export function parseParams(search: string, saved: unknown = DEFAULT_SETTINGS): Params {
@@ -22,6 +23,7 @@ export function parseParams(search: string, saved: unknown = DEFAULT_SETTINGS): 
     bots: debug ? clampInt(q.get('bots'), 0, 0, 500) : 0,
     date: q.get('date') || null,
     pattern: q.get('pattern') || null,
+    menu: q.get('menu') !== '0',
   };
 }
 

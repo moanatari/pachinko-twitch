@@ -42,12 +42,30 @@ check('streamer provisoire : retiré du top du mois', !(await inMonthly(page, 's
 
 // 2. Chaîne saisie → persistée après rechargement
 await page.fill('input[name=channel]', 'Pachinko_Test');
-await page.click('[data-act=save]');
-// 2 a. Lien copiable : adresse de la page + tous les réglages enregistrés, sans les paramètres de dev
+await page.press('input[name=channel]', 'Enter');
+const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('pachinko-settings')));
+check('enregistrement auto : sur Entrée, menu resté ouvert', (await saved())?.channel === 'pachinko_test' && await page.isVisible('.menu-backdrop'));
+check('enregistrement auto : plus de bouton Enregistrer', (await page.locator('[data-act=save]').count()) === 0);
+await page.uncheck('input[name=shake]');
+check('enregistrement auto : case à cocher au clic', (await saved()).shake === false);
+await page.check('input[name=shake]');
+await page.fill('input[name=duration]', '999');
+await page.press('input[name=duration]', 'Enter');
+check('enregistrement auto : valeur bornée remise dans le champ', (await page.inputValue('input[name=duration]')) === '60');
+await page.fill('input[name=channel]', 'bad name');
+await page.fill('input[name=duration]', '7');
+await page.keyboard.press('Escape'); // fermer enregistre la saisie en cours
+check('enregistrement auto : à la fermeture, chaîne invalide ignorée', (await saved()).duration === 7 && (await saved()).channel === 'pachinko_test');
+await page.keyboard.press('Escape');
+await page.fill('input[name=duration]', '5');
+await page.click('[data-tab=game]'); // changer d'onglet aussi
+check('enregistrement auto : au changement d\'onglet', (await saved()).duration === 5);
+await page.click('[data-tab=settings]');
+// 2 a. Lien copiable : adresse de la page + tous les réglages enregistrés + menu=0, sans les paramètres de dev
 const link = await page.inputValue('input[name=link]');
 check('lien : adresse de la page, chaîne et réglages', link.startsWith(`${URL}?channel=pachinko_test&`)
   && ['duration=5', 'maxBalls=150', 'theme=auto', 'shake=1', 'autoNext=1', 'specialEvery=20', 'specialEffects='].every((p) => link.includes(p))
-  && !link.includes('debug'), link);
+  && link.endsWith('&menu=0') && !link.includes('debug'), link);
 await page.click('[data-act=copy-link]');
 await page.waitForFunction(`document.querySelector('.menu-notice').textContent === 'Lien copié'`);
 check('lien : copié dans le presse-papiers', (await page.evaluate(() => navigator.clipboard.readText())) === link);
@@ -59,6 +77,14 @@ check('2e lancement : menu fermé', !(await page.isVisible('.menu-backdrop')));
 const w1 = await remaining(page);
 await page.waitForTimeout(1200);
 check('attente : timer figé avant la première bille', (await page.evaluate(`${G}.state.waiting`)) && (await remaining(page)) === w1, `${w1} ms`);
+// 2 bis'. « Nouvelle partie maintenant » : immédiat tant qu'aucune bille n'est jouée
+const seedWaiting = await page.evaluate(`${G}.map.seed`);
+await page.keyboard.press('Escape');
+await page.click('[data-tab=settings]');
+await page.click('[data-act=apply-now]');
+check('nouvelle partie : sans confirmation avant la première bille',
+  await page.waitForFunction(`${G}.map && ${G}.map.seed !== ${seedWaiting}`, null, { timeout: 5000 }).then(() => true, () => false));
+await page.keyboard.press('Escape');
 
 // 2 ter. Top du mois affiché pendant l'attente
 await page.evaluate(`${G}.monthly.record([${entry('42', 777)}], Date.now()); window.game.events.emit('player', '42')`);
@@ -116,7 +142,11 @@ check('ralenti : les billes des autres seulement',
 
 // 5. Historique alimenté après une partie de 1 min
 await page.fill('input[name=duration]', '1');
-await page.click('[data-act=apply-now]');
+const seedBefore = await page.evaluate(`${G}.map.seed`);
+await page.click('[data-act=apply-now]'); // arme
+check('nouvelle partie : confirmation si la partie a commencé',
+  (await page.textContent('[data-act=apply-now]')) === 'Confirmer ?' && (await page.evaluate(`${G}.map.seed`)) === seedBefore);
+await page.click('[data-act=apply-now]'); // confirme
 await page.waitForFunction(`${G}.state.remainingMs(Date.now()) > 55000 && ${G}.state.remainingMs(Date.now()) <= 60000`);
 check('durée 1 min appliquée', true);
 check('carte suivante : effets annulés', await page.evaluate(
@@ -137,6 +167,13 @@ check('historique : partie enregistrée', rec.players >= 1 && rec.top3.some((p) 
 check('debug : rien d\'enregistré dans le top du mois', !(await inMonthly(page, 'v2')));
 await page.click('[data-tab=history]');
 check('historique : affiché', await page.isVisible('.menu-history li'));
+await page.click('.menu-close');
+check('croix : menu fermé', !(await page.isVisible('.menu-backdrop')));
+await page.close();
+
+// 5 ter. Lien pour OBS : aucun menu, même sans chaîne
+page = await open('?debug=1&menu=0&channel=');
+check('menu=0 : aucun menu', (await page.locator('.menu-root').count()) === 0);
 await page.close();
 
 // 6. FPS à 150 billes, menu fermé puis ouvert

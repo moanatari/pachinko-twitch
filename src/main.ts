@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { WIDTH, HEIGHT, GRAVITY_Y } from './config';
+import { WIDTH, HEIGHT, GRAVITY_Y, params } from './config';
 import { Backdrop } from './scenes/Backdrop';
 import { Game } from './scenes/Game';
 import { Hud } from './scenes/Hud';
@@ -19,4 +19,4 @@ const game = new Phaser.Game({
   scene: [Backdrop, Game, Hud],
 });
 
-createMenu(game);
+if (params.menu) createMenu(game);

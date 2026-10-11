@@ -7,12 +7,16 @@ procédurale différente à chaque partie.
 
 Aucun backend, aucun token Twitch : le tchat est lu en anonyme.
 
+![Une partie en cours : plateau, billes des viewers et classement en direct](docs/screenshots/partie.png)
+
+![Fin de partie : podium des trois premiers](docs/screenshots/podium.png)
+
 ## Lancer le jeu (sans Twitch)
 
 Ouvrir <https://moanatari.github.io/pachinko-twitch/> dans Chrome ou Firefox : rien à installer.
 
 Au premier lancement, le menu s'ouvre sur l'onglet **Réglages** et demande ta chaîne Twitch. Le jeu tourne
-déjà : ferme le menu avec **Échap** et clique sur le plateau. Chaque clic lâche ta bille (une seule à la
+déjà : ferme le menu avec **Échap** ou la croix en haut à droite, et clique sur le plateau. Chaque clic lâche ta bille (une seule à la
 fois, comme pour les viewers).
 
 ### Mode debug
@@ -44,8 +48,9 @@ Les réglages du menu peuvent aussi être passés dans l'URL pour une session (i
 sauvegardés) : `channel`, `duration` (minutes), `maxBalls`, `shake=0`, `autoNext=0`,
 `specialEvery` (secondes entre deux taquets spéciaux, `0` = aucun), `specialEffects` (effets activés,
 ex. `moon,warp` ; ids : `double`, `moon`, `warp`, `slow`, `x2`, `gold`, `quake`).
-L'onglet Réglages du menu donne ce lien tout prêt (« Copier le lien ») avec tous les réglages en cours :
-pratique pour une source navigateur OBS, où le menu n'est pas cliquable.
+L'onglet Réglages du menu donne ce lien tout prêt (« Copier le lien ») avec tous les réglages enregistrés,
+plus `menu=0` : pratique pour une source navigateur OBS, où le menu n'est pas cliquable. Avec `menu=0`, ni
+menu ni roue crantée ne sont affichés ; retire ce paramètre pour ouvrir le lien dans un navigateur.
 
 ### Chrono, top du mois, taquets spéciaux
 
@@ -61,7 +66,8 @@ pratique pour une source navigateur OBS, où le menu n'est pas cliquable.
 ## Jouer avec Twitch
 
 1. Dans le menu (**Échap** ou roue crantée en bas à droite) → **Réglages** → saisir le login de la chaîne
-   → **Enregistrer**. C'est mémorisé pour les lancements suivants.
+   (Entrée ou clic ailleurs pour valider). Chaque réglage est enregistré dès qu'il est modifié, et
+   mémorisé pour les lancements suivants.
 2. Bouton **Plein écran** (ou F11), puis capturer la fenêtre du navigateur dans OBS.
 3. Pour les clics des viewers : installer l'extension **Heat** sur la chaîne. Le mapping des clics suppose
    un plein écran 16:9.

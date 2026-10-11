@@ -19,6 +19,7 @@ const TABS: [Tab, string][] = [['game', 'Partie'], ['players', 'Joueurs'], ['his
 const REFRESH_MS = 500; // au plus 2×/s, menu ouvert seulement
 const CURSOR_HIDE_MS = 3000;
 const CONFIRM_MS = 3000;
+const INVALID_CHANNEL = 'Nom de chaîne invalide (lettres, chiffres et _ uniquement)';
 const fr = (n: number) => n.toLocaleString('fr-FR');
 
 export function createMenu(game: Phaser.Game) {
@@ -33,7 +34,8 @@ function init(game: Phaser.Game, g: Game) {
     <button class="menu-gear" data-act="toggle" title="Menu (Échap)">⚙</button>
     <div class="menu-backdrop" hidden>
       <div class="menu-panel">
-        <nav class="menu-tabs">${TABS.map(([id, label]) => `<button data-tab="${id}">${label}</button>`).join('')}</nav>
+        <nav class="menu-tabs">${TABS.map(([id, label]) => `<button data-tab="${id}">${label}</button>`).join('')}
+          <button class="menu-close" data-act="toggle" title="Fermer (Échap)" aria-label="Fermer">✕</button></nav>
         <div class="menu-body"></div>
       </div>
     </div>`;
@@ -155,6 +157,8 @@ function init(game: Phaser.Game, g: Game) {
         <button data-act="unban" data-id="${esc(b.id)}">Réintégrer</button></li>`).join('')}</ul>`;
   };
 
+  const obsLink = () => `${location.href.split(/[?#]/)[0]}?${settingsQuery(params)}&menu=0`;
+
   const settingsHtml = () => `
     <p class="menu-notice">${esc(notice)}</p>
     <div class="menu-form">
@@ -169,21 +173,21 @@ function init(game: Phaser.Game, g: Game) {
       ${EFFECTS.map((e) => `<label class="menu-check"><input name="fx-${e.id}" type="checkbox"${params.specialEffects.split(',').includes(e.id) ? ' checked' : ''}> ${esc(e.label)}</label>`).join('')}
     </div>
     <div class="menu-actions">
-      <button data-act="save">Enregistrer</button>
-      <button data-act="apply-now">Appliquer maintenant (carte suivante)</button>
+      <button data-act="apply-now">Nouvelle partie maintenant</button>
       <button data-act="fullscreen">Plein écran</button>
     </div>
-    <p class="menu-hint">Durée, thème et enchaînement prennent effet à la partie suivante.</p>
-    <h3>Lien avec ces réglages</h3>
+    <p class="menu-hint">Les changements sont enregistrés automatiquement. Durée, thème et enchaînement prennent effet à la partie suivante : « Nouvelle partie maintenant » n'attend pas, mais coupe la partie en cours et ses scores sont perdus (deux clics pour confirmer).</p>
+    <h3>Lien pour OBS (sans menu)</h3>
     <div class="menu-link">
-      <input name="link" readonly aria-label="Lien avec ces réglages" value="${esc(`${location.href.split(/[?#]/)[0]}?${settingsQuery(params)}`)}">
+      <input name="link" readonly aria-label="Lien pour OBS (sans menu)" value="${esc(obsLink())}">
       <button data-act="copy-link">Copier le lien</button>
     </div>
-    <p class="menu-hint">À coller dans une source navigateur OBS. Il reprend les réglages en cours : enregistre d'abord tes changements.</p>
+    <p class="menu-hint">À coller dans une source navigateur OBS : le menu n'y apparaît pas. Il reprend les réglages ci-dessus.</p>
     <h3>Joueurs exclus</h3>
     <div class="menu-live"></div>`;
 
   function render() {
+    if (notice === INVALID_CHANNEL) notice = ''; // formulaire reconstruit depuis les réglages : la saisie invalide a disparu
     for (const b of root.querySelectorAll<HTMLElement>('[data-tab]')) b.classList.toggle('active', b.dataset.tab === tab);
     body.innerHTML = tab === 'settings' ? settingsHtml()
       : tab === 'players' ? `<input class="menu-search" placeholder="Rechercher un joueur" value="${esc(search)}"><div class="menu-live"></div>`
@@ -194,10 +198,13 @@ function init(game: Phaser.Game, g: Game) {
   function refreshLive() {
     const live = body.querySelector('.menu-live');
     if (!open || !live) return;
+    const now = body.querySelector('[data-act="apply-now"]'); // hors de la partie « live » : libellé rafraîchi à part
+    if (now) now.textContent = label('apply-now', 'Nouvelle partie maintenant');
     live.innerHTML = tab === 'game' ? gameHtml() : tab === 'players' ? playersHtml() : tab === 'history' ? historyHtml() : bansHtml();
   }
 
   function setOpen(on: boolean) {
+    if (!on) save();
     open = on;
     backdrop.hidden = !on;
     clearInterval(refresh);
@@ -213,13 +220,14 @@ function init(game: Phaser.Game, g: Game) {
     if (el) el.textContent = text;
   }
 
-  /** Ne sauvegarde que les champs modifiés : une surcharge d'URL laissée telle quelle n'est jamais persistée. */
+  /** Enregistrement automatique : à chaque `change`, et avant toute action ou fermeture (saisie en cours).
+   *  Ne sauvegarde que les champs modifiés : une surcharge d'URL laissée telle quelle n'est jamais persistée. */
   function save() {
+    if (!open || tab !== 'settings') return;
     const field = (name: string) => body.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
-    const channel = normalizeChannel(field('channel').value);
-    if (channel === undefined) return setNotice('Nom de chaîne invalide (lettres, chiffres et _ uniquement)');
-    g.applySettings(formPatch({
-      channel,
+    const invalid = normalizeChannel(field('channel').value) === undefined;
+    const patch = formPatch({
+      channel: field('channel').value, // invalide : chaîne inchangée, le reste est enregistré
       duration: field('duration').value, // champ vidé : valeur inchangée
       maxBalls: field('maxBalls').value,
       theme: field('theme').value,
@@ -227,9 +235,15 @@ function init(game: Phaser.Game, g: Game) {
       autoNext: field('autoNext').checked,
       specialEvery: field('specialEvery').value, // champ vidé : valeur inchangée
       specialEffects: EFFECTS.filter((e) => field(`fx-${e.id}`).checked).map((e) => e.id).join(','),
-    }, params));
-    render(); // affiche les valeurs bornées
-    setNotice(params.channel ? 'Réglages enregistrés' : 'Entre ta chaîne Twitch');
+    }, params);
+    const changed = Object.keys(patch).length > 0;
+    if (changed) g.applySettings(patch);
+    // valeurs bornées et lien remis à jour sur place : redessiner le formulaire ferait perdre le focus
+    for (const k of ['duration', 'maxBalls', 'specialEvery'] as const) field(k).value = String(params[k]);
+    if (!invalid) field('channel').value = params.channel ?? '';
+    field('link').value = obsLink();
+    if (invalid) setNotice(INVALID_CHANNEL);
+    else if (changed || notice === INVALID_CHANNEL) setNotice(params.channel ? 'Réglages enregistrés' : 'Entre ta chaîne Twitch');
   }
 
   /** Presse-papiers indisponible ou refusé : le champ reste sélectionnable à la main. */
@@ -270,8 +284,8 @@ function init(game: Phaser.Game, g: Game) {
       case 'ban': if (confirmed(`ban:${id}`)) g.moderate('ban', id); break;
       case 'unban': g.moderate('unban', id); break;
       case 'clear-history': if (confirmed('clear-history')) g.history.clear(); break;
-      case 'save': return save();
-      case 'apply-now': save(); g.admin('skip'); return;
+      // partie commencée (première bille jouée) : ses scores seraient perdus, confirmation en deux clics
+      case 'apply-now': if (g.state.phase !== 'playing' || g.state.waiting || confirmed('apply-now')) g.admin('skip'); break;
       case 'copy-link': return copyLink();
       case 'fullscreen': return toggleFullscreen();
     }
@@ -282,6 +296,7 @@ function init(game: Phaser.Game, g: Game) {
     if (e.button !== 0) return;
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act],[data-tab]');
     if (!el || el.matches(':disabled')) return;
+    save(); // le clic précède le `change` du champ en cours de saisie
     if (el.dataset.tab) {
       tab = el.dataset.tab as Tab;
       render();
@@ -293,7 +308,8 @@ function init(game: Phaser.Game, g: Game) {
     search = t.value;
     refreshLive();
   });
-  body.addEventListener('keydown', (e) => { if (e.key === 'Enter' && tab === 'settings') save(); });
+  // cases et listes : au clic ; texte et nombres : en quittant le champ ou sur Entrée (pas à chaque touche : la chaîne reconnecte le tchat)
+  body.addEventListener('change', save);
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || e.repeat) return;
     e.preventDefault();

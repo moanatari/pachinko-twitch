@@ -6,7 +6,7 @@ describe('parseParams', () => {
     expect(parseParams('')).toEqual({
       channel: null, duration: 5, maxBalls: 150, seed: null, shake: true, autoNext: true,
       specialEvery: 20, specialEffects: 'double,moon,warp,slow,x2,gold,quake',
-      debug: false, bots: 0, theme: 'auto', date: null, pattern: null,
+      debug: false, bots: 0, theme: 'auto', date: null, pattern: null, menu: true,
     });
   });
 
@@ -15,7 +15,7 @@ describe('parseParams', () => {
     expect(p).toEqual({
       channel: 'machaine', duration: 3, maxBalls: 80, seed: 42, shake: false, autoNext: true,
       specialEvery: 5, specialEffects: 'moon',
-      debug: true, bots: 20, theme: 'noel', date: '2026-12-15', pattern: 'trous',
+      debug: true, bots: 20, theme: 'noel', date: '2026-12-15', pattern: 'trous', menu: true,
     });
   });
 
@@ -38,4 +38,6 @@ describe('parseParams', () => {
   });
 
   it('bots seulement en debug', () => expect(parseParams('?bots=20').bots).toBe(0));
+
+  it('menu=0 : pas de menu (lien pour OBS)', () => expect(parseParams('?menu=0').menu).toBe(false));
 });
