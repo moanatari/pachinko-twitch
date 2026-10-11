@@ -46,12 +46,13 @@ terminée et vérifiée.
 - [x] 8. Juice + direction artistique de base (marquee, pop-ups, particules, glow, shake, animations)
 - [x] 9. Thèmes saisonniers (Halloween, Hiver, Noël, Sakura, Plage)
 - [x] 10. Les 4 autres patterns de génération
-- [ ] 11. Passe perf et réglages finaux
+- [x] 11. Passe perf et réglages finaux
 - [x] 12. Mode streamer : plein écran, menus, modération, historique (spec `docs/superpowers/specs/2026-10-02-streamer-mode-design.md`, plan `docs/superpowers/plans/2026-10-02-streamer-mode.md`)
 - [x] 13. Timer à la première bille (spec `docs/superpowers/specs/2026-10-11-timer-top-du-mois-taquets-speciaux-design.md`, plan `docs/superpowers/plans/2026-10-11-timer-top-du-mois-taquets-speciaux.md`)
 - [x] 14. Top du mois (même spec, même plan)
-- [ ] 15. Taquets spéciaux (même spec, même plan)
+- [x] 15. Taquets spéciaux (même spec, même plan)
 - [x] 16. Fin de partie nette + lien copiable des réglages
+- [x] 17. Réglages enregistrés automatiquement, croix de fermeture, lien OBS sans menu (`menu=0`)
 
 ## Décisions prises
 | Sujet | Choix |
@@ -609,10 +610,10 @@ ni hausse continue de la mémoire (onglet Memory de Chrome).
 ### 11. Passe perf et réglages finaux
 - [x] Mode bots (`?bots=N`, touche B) qui relance des billes en continu pour N faux users.
 - [x] Compteur FPS et nombre de billes affichés en debug.
-- [ ] Mesure à 150 billes dans le navigateur **et** dans OBS ; profiler (onglet Performance de
+- [x] Mesure à 150 billes dans le navigateur **et** dans OBS ; profiler (onglet Performance de
       Chrome) si moins de 60 fps.
 - [x] Ajustement des valeurs dans `config.ts` : points, forces, rayons, valeurs des bacs, durée du podium.
-- [ ] Test réel complet sur la chaîne (tchat + Heat + avatars + partie complète).
+- [x] Test réel complet sur la chaîne (tchat + Heat + avatars + partie complète).
 
 > Mesures du 2026-10-02 (Chrome, iGPU Intel UHD 630, vsync coupée, 150 billes) : 103–108 fps,
 > `Game.update` p50 ≈ 4,5 ms / p95 ≈ 7 ms. Leviers appliqués : glow PostFX remplacé par des halos
@@ -627,7 +628,7 @@ ni hausse continue de la mémoire (onglet Memory de Chrome).
 - Équilibrage : un viewer qui spamme ne doit pas écraser les autres uniquement grâce au nombre de
   lancers ; surveiller le ratio points taquets / points bacs.
 
-- [ ] **Vérif (étape terminée)** : 60 fps stables à 150 billes dans OBS ; une partie réelle de bout en bout sans bug.
+- [x] **Vérif (étape terminée)** : 60 fps stables à 150 billes dans OBS ; une partie réelle de bout en bout sans bug.
 
 ### 12. Mode streamer
 - [x] Réglages persistants (défauts < sauvegardés < URL), application à chaud (`Game.applySettings`).
@@ -655,7 +656,7 @@ ni hausse continue de la mémoire (onglet Memory de Chrome).
 - [x] Réglages `specialEvery` / `specialEffects` (menu + URL).
 - [x] `src/game/specials.ts` (catalogue + tirage, pur) et `src/scenes/specials.ts` (taquet allumé, 7 effets).
 - [x] Texture `pegSpecial` (clé fixe, teintable).
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps à `?debug=1&bots=150` ; les 7 effets vus à la main.
+- [x] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps à `?debug=1&bots=150` ; les 7 effets vus à la main.
 
 ### 16. Fin de partie nette + lien copiable des réglages
 Remplace le cycle de l'étape 5 (billes qui finissaient leur course au ralenti pendant le podium).
@@ -681,3 +682,11 @@ Remplace le cycle de l'étape 5 (billes qui finissaient leur course au ralenti p
 - Sons (Phaser les gère nativement : facile à ajouter plus tard).
 - Calibration de zone si la source OBS n'est pas plein écran.
 
+
+### 17. Réglages enregistrés automatiquement + lien OBS sans menu
+- [x] Onglet Réglages : plus de bouton « Enregistrer », chaque champ est enregistré au `change`, à la
+      fermeture et au changement d'onglet ; chaîne invalide ignorée, le reste est enregistré.
+- [x] « Nouvelle partie maintenant » : immédiat avant la première bille, deux clics si la partie a commencé.
+- [x] Croix de fermeture du menu ; `menu=0` (ajouté au lien copiable) : ni menu ni roue crantée.
+- [x] Captures d'écran dans le README (`docs/screenshots/`).
+- [x] **Vérif** : `npm run test` et `npm run verify` verts (2026-10-12, 53/53 OK, 158 fps à 148 billes).
