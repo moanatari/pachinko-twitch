@@ -11,6 +11,7 @@ const square = (r: number): [number, number] => [r * 2 * TEX_SCALE, r * 2 * TEX_
 const SIZES: Record<string, [number, number]> = {
   peg: square(PEG_R),
   pegGolden: square(PEG_R),
+  pegSpecial: square(PEG_R),
   bumper: square(BUMPER_R),
   spinner: square(SPINNER_R),
   ramp: [256, RAMP_THICK * TEX_SCALE], // étirée à la longueur de chaque rampe
@@ -28,6 +29,7 @@ const SIZES: Record<string, [number, number]> = {
 const DEFAULTS: Record<string, DrawFn> = {
   peg: D.drawPeg,
   pegGolden: D.drawPegGolden,
+  pegSpecial: D.drawPegSpecial,
   bumper: D.drawBumper,
   spinner: D.drawSpinner,
   ramp: D.drawRamp,

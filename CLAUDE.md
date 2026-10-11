@@ -16,7 +16,7 @@ Aucun backend, aucun token Twitch.
 ## Commandes
 - `npm run dev` — serveur de dev (clic = bille du streamer, Échap = menu ; `/?debug=1` : touche B = bots, T = thème)
 - `npm run build` / `npm run preview` — build statique
-- `npm run test` — vitest (mapgen, réglages, état, bans, historique, parse IRC)
+- `npm run test` — vitest (mapgen, réglages, état, bans, historique, top du mois, taquets spéciaux, parse IRC)
 - `npm run verify` — vérification navigateur du mode streamer (Playwright sur le Chrome installé, dev server lancé)
 
 ## Architecture
@@ -27,6 +27,9 @@ Aucun backend, aucun token Twitch.
 - `src/ui/` : menu DOM du streamer ; n'appelle que l'API publique de `Game` (`admin`, `replay`, `moderate`,
   `applySettings`) et lit l'état, jamais les scènes.
 - `src/scenes/Game.ts` : physique + rendu du plateau + juice ; `src/scenes/Hud.ts` : timer, classement, podium.
+- Taquets spéciaux : `src/game/specials.ts` (catalogue des effets + tirage, pur) et `src/scenes/specials.ts`
+  (taquet allumé, effets, possédé par `Game` comme `Juice`). Spec :
+  `docs/superpowers/specs/2026-10-11-timer-top-du-mois-taquets-speciaux-design.md`.
 - `src/twitch/` : `chat.ts` (IRC WebSocket anonyme), `heat.ts` (WebSocket Heat), `users.ts` (lookup + avatars).
 - Communication via `game.events` (Phaser EventEmitter), pas de bus maison.
 - `src/themes/` : thèmes visuels (spec : `docs/superpowers/specs/2026-10-02-themes-design.md`).
@@ -41,7 +44,7 @@ Aucun backend, aucun token Twitch.
 - Users : `https://heat-api.j38.net/user/{id}` → `display_name`, `profile_image_url`. Toujours passer par le cache de `users.ts`.
 
 ## Règles de perf (non négociables)
-- Une bille active max par viewer ; plafond global `maxBalls`.
+- Une bille active max par viewer (plus une bille bonus, taquet spécial) ; plafond global `maxBalls`.
 - Avatars : texture circulaire créée **une fois** par user, jamais de masque par frame.
 - Pop-ups et effets : pool d'objets, pas d'allocation dans `update()`.
 - Obstacles = corps statiques ; tourniquets kinématiques.

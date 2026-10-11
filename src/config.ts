@@ -53,12 +53,23 @@ export const HIT_COOLDOWN_MS = 150;
 export const BIG_WIN = 200; // seuil « gros bac » (marquee + shake)
 
 // --- Physique ---
+export const GRAVITY_Y = 1;
 export const MAX_SPEED = 22; // px / step
 export const BUMPER_SPEED = 14;
 export const SPINNER_SPEED = 0.03; // rad / step
 export const STUCK_SPEED = 0.3;
 export const STUCK_NUDGE_MS = 3000;
 export const STUCK_KILL_MS = 8000;
+
+// --- Taquets spéciaux ---
+export const SPECIAL_TTL_MS = 20000; // non touché : il s'éteint
+export const MOON_GRAVITY = 0.3; // fraction de la gravité normale
+export const MOON_MS = 6000;
+export const SLOW_SCALE = 0.4; // vitesse des billes ralenties
+export const SLOW_MS = 5000;
+export const X2_MS = 10000;
+export const GOLD_MS = 8000;
+export const QUAKE_KICK = 9; // px / step vers le haut
 
 // --- Partie ---
 export const PODIUM_MS = 15000;

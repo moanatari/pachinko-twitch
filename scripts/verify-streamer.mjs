@@ -24,6 +24,8 @@ const remaining = (page) => page.evaluate(`${G}.state.remainingMs(Date.now())`);
 const H = `window.game.scene.getScene('Hud')`;
 const entry = (id, score) => `{ id: '${id}', name: '${id}', color: '#ff0000', score: ${score}, scoredAt: 1, balls: 1 }`;
 const inMonthly = (page, id) => page.evaluate(`${G}.monthly.top(500, Date.now()).some((e) => e.id === '${id}')`);
+const S = `${G}.specials`;
+const gravityY = (page) => page.evaluate(`${G}.matter.world.localWorld.gravity.y`);
 
 // 1. Premier lancement → menu ouvert sur Réglages
 let page = await open('?debug=1');
@@ -58,6 +60,8 @@ check('drop avant pause', await page.evaluate(`${G}.requestDrop(${viewer('v0')},
 check('première bille : timer lancé', !(await page.evaluate(`${G}.state.waiting`)));
 await page.waitForFunction(`${H}.title.text === 'CLASSEMENT'`);
 check('première bille : classement en direct', !(await page.evaluate(`${H}.lines.some((l) => l.id === '42')`)));
+await page.evaluate(`${S}.apply('moon', [...${G}.balls.values()][0])`);
+check('gravité lunaire appliquée', (await gravityY(page)) < 1);
 await page.keyboard.press('Escape');
 await page.click('[data-tab=game]');
 await page.click('[data-act=pause]');
@@ -68,6 +72,7 @@ check('pause : drop refusé', !(await page.evaluate(`${G}.requestDrop(${viewer('
 await page.click('[data-act=pause]'); // Reprendre
 await page.waitForTimeout(300);
 check('reprise : bille conservée', (await page.evaluate(`${G}.ballCount`)) >= 1);
+check('pause : effet à durée gelé', (await gravityY(page)) < 1, 'gravité lunaire encore active après 9 s de pause');
 const t2 = await remaining(page);
 await page.waitForTimeout(1100);
 check('reprise : timer repart', (await remaining(page)) < t2);
@@ -86,11 +91,26 @@ await page.click('[data-tab=settings]');
 await page.click('[data-act=unban][data-id=v1]');
 check('réintégré : drop accepté', await page.evaluate(`${G}.requestDrop(${viewer('v1')}, 400)`));
 
+// 4 bis. Taquets spéciaux : chaque effet s'applique sans erreur
+await page.evaluate(`${G}.requestDrop(${viewer('v3')}, 900)`);
+const before = await page.evaluate(`${G}.ballCount`);
+await page.evaluate(`(() => {
+  const b = [...${G}.balls.values()].find((x) => x.userId === 'v3');
+  for (const id of ['double', 'moon', 'warp', 'slow', 'x2', 'gold', 'quake']) ${S}.apply(id, b);
+})()`);
+check('bille bonus : une bille de plus', (await page.evaluate(`${G}.ballCount`)) === before + 1);
+check('bille bonus : pas de 3e bille pour le viewer', !(await page.evaluate(`${G}.requestDrop(${viewer('v3')}, 900)`)));
+check('points ×2 et pluie d\'or actifs', await page.evaluate(`${S}.mult('v3') === 2 && ${S}.gold`));
+check('ralenti : les billes des autres seulement',
+  await page.evaluate(`[...${G}.balls.values()].every((b) => b.body.timeScale === (b.userId === 'v3' ? 1 : 0.4))`));
+
 // 5. Historique alimenté après une partie de 1 min
 await page.fill('input[name=duration]', '1');
 await page.click('[data-act=apply-now]');
 await page.waitForFunction(`${G}.state.remainingMs(Date.now()) > 55000 && ${G}.state.remainingMs(Date.now()) <= 60000`);
 check('durée 1 min appliquée', true);
+check('carte suivante : effets annulés', await page.evaluate(
+  `${G}.matter.world.localWorld.gravity.y === 1 && !${S}.gold && ${S}.mult('v3') === 1`));
 await page.evaluate(`${G}.requestDrop(${viewer('v2')}, 700)`);
 await page.waitForFunction(`${G}.history.list.length > 0`, null, { timeout: 100_000 });
 const rec = await page.evaluate(`${G}.history.list[0]`);
@@ -101,7 +121,12 @@ check('historique : affiché', await page.isVisible('.menu-history li'));
 await page.close();
 
 // 6. FPS à 150 billes, menu fermé puis ouvert
-page = await open('?debug=1&bots=150');
+page = await open('?debug=1&bots=150&specialEvery=2');
+await page.evaluate(`(() => {
+  const s = ${S}, apply = s.apply.bind(s);
+  window.__fx = 0;
+  s.apply = (id, ball) => { window.__fx++; apply(id, ball); };
+})()`);
 await page.waitForTimeout(8000);
 const fps = async () => {
   let sum = 0;
@@ -109,6 +134,8 @@ const fps = async () => {
   return Math.round(sum / 6);
 };
 const closed = await fps();
+const fx = await page.evaluate('window.__fx');
+check('taquets spéciaux : déclenchés par les billes', fx > 0, `${fx} effets en ~11 s`);
 await page.keyboard.press('Escape');
 await page.click('[data-tab=players]');
 const opened = await fps();

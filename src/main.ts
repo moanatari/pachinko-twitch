@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { WIDTH, HEIGHT } from './config';
+import { WIDTH, HEIGHT, GRAVITY_Y } from './config';
 import { Backdrop } from './scenes/Backdrop';
 import { Game } from './scenes/Game';
 import { Hud } from './scenes/Hud';
@@ -14,7 +14,7 @@ const game = new Phaser.Game({
   physics: {
     default: 'matter',
     // itérations réduites (défaut 6/4) : les 2 sous-pas par frame assurent déjà la stabilité
-    matter: { gravity: { x: 0, y: 1 }, enableSleeping: false, autoUpdate: false, positionIterations: 4, velocityIterations: 3 },
+    matter: { gravity: { x: 0, y: GRAVITY_Y }, enableSleeping: false, autoUpdate: false, positionIterations: 4, velocityIterations: 3 },
   },
   scene: [Backdrop, Game, Hud],
 });

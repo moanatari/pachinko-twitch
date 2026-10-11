@@ -18,7 +18,7 @@ export interface Palette {
 export type DrawFn = (ctx: CanvasRenderingContext2D, w: number, h: number, palette: Palette) => void;
 export type SpriteSource = string | DrawFn; // chemin d'image dans public/ ou fonction de dessin
 
-export type ElementKey = 'peg' | 'pegGolden' | 'bumper' | 'spinner' | 'ramp' | 'background';
+export type ElementKey = 'peg' | 'pegGolden' | 'pegSpecial' | 'bumper' | 'spinner' | 'ramp' | 'background';
 export type ParticleKey = 'hit' | 'bumper' | 'bin' | 'confetti';
 
 export interface Ambient {

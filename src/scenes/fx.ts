@@ -176,6 +176,9 @@ export class Juice {
     if (speed > 5) this.trail.emitParticleAt(x, y, speed > 12 ? 2 : 1);
   }
 
+  /** Séisme (taquet spécial) : grosse secousse, soumise au réglage et au cooldown habituels. */
+  quake() { this.shake(400, 0.012); }
+
   private shake(duration: number, intensity: number) {
     const now = this.scene.time.now;
     if (!params.shake || now - this.lastShake < SHAKE_COOLDOWN_MS) return;

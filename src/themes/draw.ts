@@ -43,6 +43,18 @@ export const drawPegGolden: DrawFn = (ctx, w, _h, p) => {
   disc(ctx, r, r, r * 0.98);
 };
 
+/** Taquet spécial : perle blanche à liseré, teintée à l'usage de la couleur de l'effet. */
+export const drawPegSpecial: DrawFn = (ctx, w) => {
+  const r = w / 2;
+  const g = ctx.createRadialGradient(r * 0.7, r * 0.6, r * 0.05, r, r, r);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.6, '#e6e6e6');
+  g.addColorStop(0.85, '#9a9a9a');
+  g.addColorStop(1, '#ffffff');
+  ctx.fillStyle = g;
+  disc(ctx, r, r, r * 0.98);
+};
+
 /** Ampoule de pachinko : anneau chrome, gorge sombre, cœur coloré translucide. */
 export const drawBumper: DrawFn = (ctx, w, h, p) => {
   const r = w / 2;

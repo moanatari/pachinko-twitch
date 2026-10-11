@@ -22,12 +22,13 @@ import { THEMES } from '../themes/index';
 import type { AdminAction } from '../twitch/chat';
 import { Juice, type Pulse } from './fx';
 import { ROWS } from './Hud';
+import { Specials } from './specials';
 
 type Body = MatterJS.BodyType;
 export type ModAction = 'removeBall' | 'resetScore' | 'ban' | 'unban';
 const STREAMER: Viewer = { id: 'streamer', name: 'Streamer', color: colorFor('streamer') }; // sans chaîne / avant le room-id
 
-interface Ball {
+export interface Ball {
   userId: string;
   body: Body;
   img: Phaser.GameObjects.Image;
@@ -46,6 +47,8 @@ interface El {
 }
 
 interface SpinnerRt { body: Body; img: Phaser.GameObjects.Image; speed: number }
+/** Taquet non doré de la carte : candidat aux taquets spéciaux, repeint par la pluie d'or. */
+export interface PegRt { x: number; y: number; bodyId: number; img: Phaser.GameObjects.Image }
 
 const DIVIDER = 6;
 const hex = (c: string) => Phaser.Display.Color.HexStringToColor(c).color;
@@ -53,7 +56,7 @@ const hex = (c: string) => Phaser.Display.Color.HexStringToColor(c).color;
 export class Game extends Phaser.Scene {
   theme!: Theme;
   map?: MapData;
-  private balls = new Map<number, Ball>(); // id du body → bille
+  readonly balls = new Map<number, Ball>(); // id du body → bille
   private els = new Map<number, El>(); // id du body → obstacle
   private mapBodies: Body[] = [];
   private mapObjects: Phaser.GameObjects.GameObject[] = [];
@@ -70,7 +73,9 @@ export class Game extends Phaser.Scene {
   private loading = false;
   private pendingAvatars = new Set<string>();
   private forcedTheme?: string; // debug : touche T
-  private fx = new Juice(this);
+  readonly pegs: PegRt[] = [];
+  readonly fx = new Juice(this);
+  private specials = new Specials(this);
   private frame = 0; // traînées : une frame sur deux
   private queued = new Map<string, () => void>(); // commandes reçues pendant un chargement, rejouées ensuite
 
@@ -222,6 +227,7 @@ export class Game extends Phaser.Scene {
     this.map = undefined; // suspend update() pendant la transition
     for (const ball of [...this.balls.values()]) this.removeBall(ball);
     this.toRemove.length = 0;
+    this.specials.clear(); // avant clearMap : la pluie d'or repeint des images de taquets encore vivantes
     this.clearMap();
     const theme = resolveTheme(todayMMDD(params.date), this.forcedTheme ?? (params.theme === 'auto' ? null : params.theme));
     if (theme.id !== this.theme?.id) {
@@ -252,6 +258,7 @@ export class Game extends Phaser.Scene {
     this.mapObjects = [];
     this.mapBodies = [];
     this.spinners = [];
+    this.pegs.length = 0;
     this.els.clear();
   }
 
@@ -272,6 +279,7 @@ export class Game extends Phaser.Scene {
       const body = this.staticBody(this.matter.add.circle(p.x, p.y, PEG_R, { isStatic: true, label: 'peg' }));
       if (p.golden) this.halo(p.x, p.y, PEG_R * 5, pal.pegGolden);
       const img = this.track(this.add.image(p.x, p.y, p.golden ? 'pegGolden' : 'peg').setDisplaySize(PEG_R * 2, PEG_R * 2));
+      if (!p.golden) this.pegs.push({ x: p.x, y: p.y, bodyId: body.id, img });
       this.els.set(body.id, {
         kind: 'peg', points: p.golden ? PTS_PEG_GOLDEN : PTS_PEG, golden: p.golden,
         pulse: { kind: 'peg', v: 0, img, size: PEG_R * 2 },
@@ -330,6 +338,12 @@ export class Game extends Phaser.Scene {
       }
     });
     g.fillStyle(hex(pal.frame), 1).fillRect(WALL, map.binTop - 2, BOARD_W - WALL * 2, 3);
+
+    // taquet spécial : pastille + halo créés une fois par carte, déplacés et teintés à chaque apparition
+    this.specials.attach(
+      this.track(this.add.image(0, 0, 'pegSpecial').setDisplaySize(PEG_R * 2.6, PEG_R * 2.6).setVisible(false)),
+      this.track(this.add.image(0, 0, 'fx-glow').setDisplaySize(PEG_R * 9, PEG_R * 9).setBlendMode('ADD').setDepth(-1).setVisible(false)),
+    );
   }
 
   /** Halo additif pulsant, posé SOUS l'élément. Remplace le glow PostFX (une passe de rendu par objet :
@@ -351,9 +365,8 @@ export class Game extends Phaser.Scene {
   }
 
   /** Lâche une bille en x (coordonnée plateau). La bille tombe tout de suite, l'avatar arrive après. */
-  private drop(viewer: Viewer, x: number): Ball {
+  private drop(viewer: Viewer, x: number, y = BALL_R + 24): Ball {
     const bx = Phaser.Math.Clamp(x, WALL + BALL_R + 2, BOARD_W - WALL - BALL_R - 2);
-    const y = BALL_R + 24;
     const body = this.matter.add.circle(bx, y, BALL_R, {
       restitution: 0.5, friction: 0.001, frictionAir: 0.0008, label: 'ball',
     });
@@ -368,6 +381,16 @@ export class Game extends Phaser.Scene {
     this.balls.set(body.id, ball);
     this.fx.label(viewer.name, body.position);
     return ball;
+  }
+
+  /** Bille bonus (taquet spécial) : part de la bille d'origine, à l'opposé ; refusée au plafond de billes. */
+  bonusBall(from: Ball) {
+    const viewer = this.state.players.get(from.userId);
+    if (!viewer || !this.state.extraBall(from.userId)) return;
+    const { x, y } = from.body.position;
+    const dir = from.body.velocity.x > 0 ? -1 : 1;
+    const ball = this.drop(viewer, x + dir * 2, y);
+    this.matter.body.setVelocity(ball.body, { x: dir * 3, y: Math.min(from.body.velocity.y, 0) });
   }
 
   /** Nom + avatar en arrière-plan ; échange la texture des billes en jeu quand l'avatar arrive. */
@@ -405,18 +428,20 @@ export class Game extends Phaser.Scene {
       const { x, y } = ball.body.position;
       if (el.kind === 'bin') {
         ball.done = true; // avant destruction : un 2e événement dans la même frame est ignoré
-        this.score(ball, el.points, x, y);
-        this.fx.bin(el.pulse, el.binX ?? x, this.map!.binTop, el.points, el.points >= BIG_WIN);
+        const pts = this.score(ball, el.points, x, y);
+        this.fx.bin(el.pulse, el.binX ?? x, this.map!.binTop, pts, el.points >= BIG_WIN);
         this.toRemove.push(ball);
         continue;
       }
       if (el.kind === 'bumper') this.bounce(ball, other);
+      else if (el.kind === 'peg') this.specials.hit(other.id, ball); // avant le cooldown : le 1er contact compte toujours
       const last = ball.hits.get(other.id) ?? -Infinity;
       if (this.time.now - last < HIT_COOLDOWN_MS) continue;
       ball.hits.set(other.id, this.time.now);
-      this.score(ball, el.points, x, y);
-      this.fx.popup(x, y, el.points);
-      if (el.kind === 'peg') this.fx.peg(el.pulse, x, y, !!el.golden);
+      const gold = el.kind === 'peg' && this.specials.gold;
+      const pts = this.score(ball, gold ? PTS_PEG_GOLDEN : el.points, x, y);
+      this.fx.popup(x, y, pts);
+      if (el.kind === 'peg') this.fx.peg(el.pulse, x, y, !!el.golden || gold);
       else if (el.kind === 'bumper') this.fx.bumper(el.pulse, x, y);
       else this.fx.spinner(el.pulse, x, y);
     }
@@ -451,9 +476,12 @@ export class Game extends Phaser.Scene {
     }
   }
 
-  private score(ball: Ball, points: number, x: number, y: number) {
-    this.state.addScore(ball.userId, points, Date.now());
-    this.game.events.emit('score', ball.userId, points, x, y);
+  /** Renvoie les points réellement marqués (doublés par le taquet « points ×2 »). */
+  private score(ball: Ball, points: number, x: number, y: number): number {
+    const pts = points * this.specials.mult(ball.userId);
+    this.state.addScore(ball.userId, pts, Date.now());
+    this.game.events.emit('score', ball.userId, pts, x, y);
+    return pts;
   }
 
   /** Seul chemin de fin de bille (bac, anti-blocage, reset) : libère toujours le viewer. */
@@ -468,7 +496,10 @@ export class Game extends Phaser.Scene {
   update(_time: number, delta: number) {
     if (!this.map) return;
     const transition = this.state.tick(Date.now());
-    if (transition === 'podium') this.game.events.emit('phase', 'podium');
+    if (transition === 'podium') {
+      this.specials.clear(); // les billes encore en jeu finissent leur course sans effet
+      this.game.events.emit('phase', 'podium');
+    }
     if (transition === 'next') {
       this.recordGame();
       if (params.autoNext) {
@@ -496,6 +527,7 @@ export class Game extends Phaser.Scene {
       if (trail) this.fx.trailAt(ball.body.position.x, ball.body.position.y, speed);
     }
     this.fx.update(delta);
+    this.specials.update(delta);
     for (const ball of this.toRemove) this.removeBall(ball);
     this.toRemove.length = 0;
   }
