@@ -6,7 +6,7 @@ import './menu.css';
 import { params, WIDTH } from '../config';
 import { THEMES } from '../themes/index';
 import { PATTERNS, type PatternId } from '../mapgen';
-import { normalizeChannel, formPatch } from '../settings';
+import { normalizeChannel, formPatch, settingsQuery } from '../settings';
 import { EFFECTS } from '../game/specials';
 import { users } from '../twitch/users';
 import { mmss } from '../scenes/Hud';
@@ -174,6 +174,12 @@ function init(game: Phaser.Game, g: Game) {
       <button data-act="fullscreen">Plein écran</button>
     </div>
     <p class="menu-hint">Durée, thème et enchaînement prennent effet à la partie suivante.</p>
+    <h3>Lien avec ces réglages</h3>
+    <div class="menu-link">
+      <input name="link" readonly aria-label="Lien avec ces réglages" value="${esc(`${location.href.split(/[?#]/)[0]}?${settingsQuery(params)}`)}">
+      <button data-act="copy-link">Copier le lien</button>
+    </div>
+    <p class="menu-hint">À coller dans une source navigateur OBS. Il reprend les réglages en cours : enregistre d'abord tes changements.</p>
     <h3>Joueurs exclus</h3>
     <div class="menu-live"></div>`;
 
@@ -226,6 +232,14 @@ function init(game: Phaser.Game, g: Game) {
     setNotice(params.channel ? 'Réglages enregistrés' : 'Entre ta chaîne Twitch');
   }
 
+  /** Presse-papiers indisponible ou refusé : le champ reste sélectionnable à la main. */
+  function copyLink() {
+    const link = body.querySelector<HTMLInputElement>('[name="link"]')!.value;
+    const failed = () => setNotice('Copie impossible : sélectionne le lien et copie-le à la main');
+    if (!navigator.clipboard) return failed();
+    navigator.clipboard.writeText(link).then(() => setNotice('Lien copié'), failed);
+  }
+
   function toggleFullscreen() {
     if (document.fullscreenElement) {
       void document.exitFullscreen();
@@ -258,6 +272,7 @@ function init(game: Phaser.Game, g: Game) {
       case 'clear-history': if (confirmed('clear-history')) g.history.clear(); break;
       case 'save': return save();
       case 'apply-now': save(); g.admin('skip'); return;
+      case 'copy-link': return copyLink();
       case 'fullscreen': return toggleFullscreen();
     }
     refreshLive();

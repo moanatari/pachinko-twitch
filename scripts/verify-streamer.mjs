@@ -11,7 +11,7 @@ const check = (name, ok, detail = '') => {
 };
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
-const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, permissions: ['clipboard-read', 'clipboard-write'] });
 const errors = [];
 const open = async (query) => {
   const page = await ctx.newPage();
@@ -43,6 +43,14 @@ check('streamer provisoire : retiré du top du mois', !(await inMonthly(page, 's
 // 2. Chaîne saisie → persistée après rechargement
 await page.fill('input[name=channel]', 'Pachinko_Test');
 await page.click('[data-act=save]');
+// 2 a. Lien copiable : adresse de la page + tous les réglages enregistrés, sans les paramètres de dev
+const link = await page.inputValue('input[name=link]');
+check('lien : adresse de la page, chaîne et réglages', link.startsWith(`${URL}?channel=pachinko_test&`)
+  && ['duration=5', 'maxBalls=150', 'theme=auto', 'shake=1', 'autoNext=1', 'specialEvery=20', 'specialEffects='].every((p) => link.includes(p))
+  && !link.includes('debug'), link);
+await page.click('[data-act=copy-link]');
+await page.waitForFunction(`document.querySelector('.menu-notice').textContent === 'Lien copié'`);
+check('lien : copié dans le presse-papiers', (await page.evaluate(() => navigator.clipboard.readText())) === link);
 await page.reload();
 await page.waitForFunction(`!!${G}?.map`);
 check('chaîne persistée', await page.evaluate(() => JSON.parse(localStorage.getItem('pachinko-settings')).channel) === 'pachinko_test');
@@ -114,6 +122,15 @@ check('durée 1 min appliquée', true);
 check('carte suivante : effets annulés', await page.evaluate(
   `${G}.matter.world.localWorld.gravity.y === 1 && !${S}.gold && ${S}.mult('v3') === 1`));
 await page.evaluate(`${G}.requestDrop(${viewer('v2')}, 700)`);
+// 5 bis. Fin de partie : une bille lâchée juste avant 0:00 est retirée, le score ne bouge plus
+await page.waitForFunction(`!${G}.state.waiting && ${G}.state.remainingMs(Date.now()) < 800`, null, { timeout: 100_000 });
+check('drop juste avant la fin', await page.evaluate(`${G}.requestDrop(${viewer('v4')}, 700)`));
+await page.waitForFunction(`${G}.state.phase === 'podium'`);
+const total = () => page.evaluate(`[...${G}.state.players.values()].reduce((n, p) => n + p.score, 0)`);
+const frozen = await total();
+check('fin de partie : plus aucune bille', (await page.evaluate(`${G}.ballCount`)) === 0);
+await page.waitForTimeout(2000);
+check('fin de partie : score figé', (await total()) === frozen, `${frozen} pts`);
 await page.waitForFunction(`${G}.history.list.length > 0`, null, { timeout: 100_000 });
 const rec = await page.evaluate(`${G}.history.list[0]`);
 check('historique : partie enregistrée', rec.players >= 1 && rec.top3.some((p) => p.id === 'v2'), JSON.stringify(rec.top3));

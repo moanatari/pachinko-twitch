@@ -51,6 +51,7 @@ terminée et vérifiée.
 - [x] 13. Timer à la première bille (spec `docs/superpowers/specs/2026-10-11-timer-top-du-mois-taquets-speciaux-design.md`, plan `docs/superpowers/plans/2026-10-11-timer-top-du-mois-taquets-speciaux.md`)
 - [x] 14. Top du mois (même spec, même plan)
 - [ ] 15. Taquets spéciaux (même spec, même plan)
+- [x] 16. Fin de partie nette + lien copiable des réglages
 
 ## Décisions prises
 | Sujet | Choix |
@@ -148,7 +149,7 @@ Seed aléatoire à chaque partie, forçable via `?seed=` (rejouer une carte).
 - Drop refusé si le viewer a déjà une bille active ou si `maxBalls` atteint (silencieux côté jeu).
 - Score de partie uniquement (remis à zéro à chaque partie). Historique all-time : hors scope.
 - Phases : `playing` (timer `?duration=` minutes, défaut 5) → `podium` (~15 s, plus de drops,
-  billes restantes finissent leur course puis comptent) → nouvelle carte → `playing`.
+  billes restantes retirées à 0:00 : le score est figé) → nouvelle carte → `playing`.
 - Commandes tchat :
   - `!drop` → X aléatoire ; `!drop 37` → X à 37 % de la largeur du plateau.
   - `!pachinko start|stop|skip` réservé broadcaster/moderator (tag `badges`).
@@ -162,7 +163,7 @@ Seed aléatoire à chaque partie, forçable via `?seed=` (rejouer une carte).
 - **PostFX** : glow sur bumpers et taquets dorés (WebGL), bloom léger optionnel.
 - **Camera shake** sur bumper et gros bac (dosé, désactivable via `?shake=0`).
 - **Classement** : lignes qui glissent (tween Y) quand les rangs changent, avatar + nom + score.
-- **Podium** : slow-mo léger de la physique, top 3 avec avatars, confettis.
+- **Podium** : top 3 avec avatars, confettis.
 - Nom du viewer affiché au-dessus de sa bille à la création (fade après ~1 s) pour qu'il la repère.
 
 ## Performance (règles à respecter dès le début)
@@ -655,6 +656,13 @@ ni hausse continue de la mémoire (onglet Memory de Chrome).
 - [x] `src/game/specials.ts` (catalogue + tirage, pur) et `src/scenes/specials.ts` (taquet allumé, 7 effets).
 - [x] Texture `pegSpecial` (clé fixe, teintable).
 - [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps à `?debug=1&bots=150` ; les 7 effets vus à la main.
+
+### 16. Fin de partie nette + lien copiable des réglages
+Remplace le cycle de l'étape 5 (billes qui finissaient leur course au ralenti pendant le podium).
+- [x] À 0:00 (ou « Terminer maintenant ») : toutes les billes retirées avant le podium, score figé, plus de ralenti.
+- [x] `settingsQuery` (`src/settings.ts`, inverse de `mergeSettings`) + champ « Lien avec ces réglages » et
+      bouton « Copier le lien » dans l'onglet Réglages (source navigateur OBS, GitHub Pages).
+- [x] **Vérif** : `npm run test` et `npm run verify` verts (bille lâchée juste avant 0:00 retirée, score figé, lien copié).
 
 ## Vérification
 - `npm run test` : `mapgen.test.ts` (1000 seeds × 5 patterns respectent les règles),

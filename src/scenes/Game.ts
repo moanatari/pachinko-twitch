@@ -503,7 +503,9 @@ export class Game extends Phaser.Scene {
     if (!this.map) return;
     const transition = this.state.tick(Date.now());
     if (transition === 'podium') {
-      this.specials.clear(); // les billes encore en jeu finissent leur course sans effet
+      // score figé à 0:00 : aucune bille ne finit sa course pendant le podium
+      for (const ball of [...this.balls.values()]) this.removeBall(ball);
+      this.specials.clear();
       this.game.events.emit('phase', 'podium');
     }
     if (transition === 'next') {
@@ -514,8 +516,7 @@ export class Game extends Phaser.Scene {
       }
     }
     // deux sous-pas par frame : une bille rapide ne traverse pas un obstacle fin
-    const slowMo = this.state.phase === 'podium' ? 0.5 : 1; // ralenti pendant le podium
-    const dt = (Math.min(delta, 33.3) / 2) * slowMo; // Matter recommande ≤ 16.67 ms par pas
+    const dt = Math.min(delta, 33.3) / 2; // Matter recommande ≤ 16.67 ms par pas
     for (let i = 0; i < 2; i++) {
       // setAngle(..., true) met à jour anglePrev : le solveur transmet l'élan du tourniquet
       for (const s of this.spinners) this.matter.body.setAngle(s.body, s.body.angle + (s.speed * dt) / 16.667, true);

@@ -64,6 +64,16 @@ export function mergeSettings(defaults: Settings, saved: unknown, search: string
   return sanitizeSettings(url, sanitizeSettings(saved, defaults));
 }
 
+/** Inverse de `mergeSettings` : tous les réglages en paramètres d'URL (lien autonome, ex. source navigateur OBS). */
+export function settingsQuery(s: Settings): string {
+  const q = new URLSearchParams();
+  for (const k of Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]) {
+    const v = s[k];
+    q.set(k, typeof v === 'boolean' ? (v ? '1' : '0') : String(v ?? ''));
+  }
+  return q.toString();
+}
+
 /** Modification partielle venue du menu, validée champ par champ. */
 export const updateSettings = (base: Settings, patch: Partial<Settings>) => sanitizeSettings({ ...base, ...patch }, base);
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  DEFAULT_SETTINGS, loadSettings, saveSettings, mergeSettings, updateSettings, normalizeChannel, formPatch,
+  DEFAULT_SETTINGS, loadSettings, saveSettings, mergeSettings, updateSettings, normalizeChannel, formPatch, settingsQuery,
+  type Settings,
 } from './settings';
 import { ALL_EFFECTS } from './game/specials';
 
@@ -63,6 +64,19 @@ describe('mergeSettings', () => {
     expect(mergeSettings(DEFAULT_SETTINGS, { channel: 'machaine' }, '?channel=').channel).toBeNull());
   it('autoNext et theme lus depuis l\'URL', () =>
     expect(mergeSettings(DEFAULT_SETTINGS, {}, '?autoNext=0&theme=noel')).toMatchObject({ autoNext: false, theme: 'noel' }));
+});
+
+describe('settingsQuery (lien copiable)', () => {
+  const s: Settings = {
+    channel: 'machaine', duration: 3, maxBalls: 80, theme: 'noel', shake: false, autoNext: false,
+    specialEvery: 45, specialEffects: 'moon,warp',
+  };
+  it('aller-retour : le lien redonne exactement les réglages', () =>
+    expect(mergeSettings(DEFAULT_SETTINGS, {}, `?${settingsQuery(s)}`)).toEqual(s));
+  it('écrase tous les réglages sauvegardés, même par un défaut ou une chaîne vide', () =>
+    expect(mergeSettings(DEFAULT_SETTINGS, s, `?${settingsQuery(DEFAULT_SETTINGS)}`)).toEqual(DEFAULT_SETTINGS));
+  it('paramètres de dev de `params` laissés hors du lien', () =>
+    expect(settingsQuery({ ...s, debug: true, seed: 42 } as Settings)).not.toMatch(/debug|seed/));
 });
 
 describe('updateSettings', () => {

@@ -48,6 +48,8 @@
 }
 .menu-root input[type="checkbox"] { width: 24px; height: 24px; accent-color: var(--accent); }
 .menu-search { width: 100%; box-sizing: border-box; margin-bottom: 12px; }
+.menu-link { display: flex; gap: 12px; }
+.menu-link input { flex: 1; min-width: 0; }
 .menu-table { width: 100%; border-collapse: collapse; }
 .menu-table th { text-align: left; color: var(--accent); font-weight: normal; }
 .menu-table td, .menu-table th { padding: 6px 8px; border-bottom: 1px solid color-mix(in srgb, var(--frame) 40%, transparent); }
