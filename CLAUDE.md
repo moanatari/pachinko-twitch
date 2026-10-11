@@ -23,7 +23,7 @@ Aucun backend, aucun token Twitch.
 - `src/mapgen.ts` : génération procédurale **pure** (seed → éléments). Ne jamais importer Phaser ici.
 - `src/game/state.ts` : source de vérité joueurs/scores/billes actives/phase/pause.
 - `src/settings.ts` + `src/storage.ts` : réglages persistants (URL > sauvegardé > défaut), localStorage tolérant.
-  `params` (config.ts) est le résultat mutable de cette fusion. `src/game/bans.ts`, `src/game/history.ts` : purs, persistants.
+  `params` (config.ts) est le résultat mutable de cette fusion. `src/game/bans.ts`, `src/game/history.ts`, `src/game/monthly.ts` (top du mois) : purs, persistants.
 - `src/ui/` : menu DOM du streamer ; n'appelle que l'API publique de `Game` (`admin`, `replay`, `moderate`,
   `applySettings`) et lit l'état, jamais les scènes.
 - `src/scenes/Game.ts` : physique + rendu du plateau + juice ; `src/scenes/Hud.ts` : timer, classement, podium.

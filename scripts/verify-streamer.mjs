@@ -21,6 +21,9 @@ const open = async (query) => {
   return page;
 };
 const remaining = (page) => page.evaluate(`${G}.state.remainingMs(Date.now())`);
+const H = `window.game.scene.getScene('Hud')`;
+const entry = (id, score) => `{ id: '${id}', name: '${id}', color: '#ff0000', score: ${score}, scoredAt: 1, balls: 1 }`;
+const inMonthly = (page, id) => page.evaluate(`${G}.monthly.top(500, Date.now()).some((e) => e.id === '${id}')`);
 
 // 1. Premier lancement → menu ouvert sur Réglages
 let page = await open('?debug=1');
@@ -45,9 +48,16 @@ const w1 = await remaining(page);
 await page.waitForTimeout(1200);
 check('attente : timer figé avant la première bille', (await page.evaluate(`${G}.state.waiting`)) && (await remaining(page)) === w1, `${w1} ms`);
 
+// 2 ter. Top du mois affiché pendant l'attente
+await page.evaluate(`${G}.monthly.record([${entry('42', 777)}], Date.now()); window.game.events.emit('player', '42')`);
+await page.waitForFunction(`${H}.title.text.startsWith('TOP DU MOIS')`);
+check('attente : top du mois affiché', await page.evaluate(`${H}.lines.some((l) => l.id === '42')`));
+
 // 3. Pause : timer gelé, drops refusés, billes conservées après une longue pause
 check('drop avant pause', await page.evaluate(`${G}.requestDrop(${viewer('v0')}, 300)`));
 check('première bille : timer lancé', !(await page.evaluate(`${G}.state.waiting`)));
+await page.waitForFunction(`${H}.title.text === 'CLASSEMENT'`);
+check('première bille : classement en direct', !(await page.evaluate(`${H}.lines.some((l) => l.id === '42')`)));
 await page.keyboard.press('Escape');
 await page.click('[data-tab=game]');
 await page.click('[data-act=pause]');
@@ -65,11 +75,13 @@ check('reprise : timer repart', (await remaining(page)) < t2);
 // 4. Exclure empêche un drop (clics pendant les rafraîchissements 2×/s)
 check('drop viewer', await page.evaluate(`${G}.requestDrop(${viewer('v1')}, 400)`));
 await page.click('[data-tab=players]');
+await page.evaluate(`${G}.monthly.record([${entry('v1', 5)}], Date.now())`);
 await page.click('[data-act=ban][data-id=v1]'); // arme
 await page.click('[data-act=ban][data-id=v1]'); // confirme
 check('exclu : retiré du classement', !(await page.evaluate(`${G}.state.players.has('v1')`)));
 check('exclu : drop refusé', !(await page.evaluate(`${G}.requestDrop(${viewer('v1')}, 400)`)));
 check('exclu : ban persisté', await page.evaluate(() => localStorage.getItem('pachinko-bans').includes('"v1"')));
+check('exclu : retiré du top du mois', !(await inMonthly(page, 'v1')));
 await page.click('[data-tab=settings]');
 await page.click('[data-act=unban][data-id=v1]');
 check('réintégré : drop accepté', await page.evaluate(`${G}.requestDrop(${viewer('v1')}, 400)`));
@@ -83,6 +95,7 @@ await page.evaluate(`${G}.requestDrop(${viewer('v2')}, 700)`);
 await page.waitForFunction(`${G}.history.list.length > 0`, null, { timeout: 100_000 });
 const rec = await page.evaluate(`${G}.history.list[0]`);
 check('historique : partie enregistrée', rec.players >= 1 && rec.top3.some((p) => p.id === 'v2'), JSON.stringify(rec.top3));
+check('debug : rien d\'enregistré dans le top du mois', !(await inMonthly(page, 'v2')));
 await page.click('[data-tab=history]');
 check('historique : affiché', await page.isVisible('.menu-history li'));
 await page.close();

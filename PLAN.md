@@ -49,7 +49,7 @@ terminée et vérifiée.
 - [ ] 11. Passe perf et réglages finaux
 - [x] 12. Mode streamer : plein écran, menus, modération, historique (spec `docs/superpowers/specs/2026-10-02-streamer-mode-design.md`, plan `docs/superpowers/plans/2026-10-02-streamer-mode.md`)
 - [x] 13. Timer à la première bille (spec `docs/superpowers/specs/2026-10-11-timer-top-du-mois-taquets-speciaux-design.md`, plan `docs/superpowers/plans/2026-10-11-timer-top-du-mois-taquets-speciaux.md`)
-- [ ] 14. Top du mois (même spec, même plan)
+- [x] 14. Top du mois (même spec, même plan)
 - [ ] 15. Taquets spéciaux (même spec, même plan)
 
 ## Décisions prises
@@ -645,10 +645,10 @@ ni hausse continue de la mémoire (onglet Memory de Chrome).
 - [x] **Vérif** : `npm run test` et `npm run verify` verts (timer figé avant la première bille).
 
 ### 14. Top du mois
-- [ ] `src/game/monthly.ts` : meilleur score par viewer sur le mois civil, persistant, anonymes exclus.
-- [ ] Enregistrement en fin de podium (hors `?debug=1`), retrait à l'exclusion.
-- [ ] Panneau latéral « TOP DU MOIS » pendant le podium et l'attente.
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; à la main : record visible dès le podium, conservé après rechargement.
+- [x] `src/game/monthly.ts` : meilleur score par viewer sur le mois civil, persistant, anonymes exclus.
+- [x] Enregistrement en fin de podium (hors `?debug=1`), retrait à l'exclusion.
+- [x] Panneau latéral « TOP DU MOIS » pendant le podium et l'attente.
+- [x] **Vérif** : `npm run test` et `npm run verify` verts ; à la main : record visible dès le podium, conservé après rechargement.
 
 ### 15. Taquets spéciaux
 - [ ] Réglages `specialEvery` / `specialEffects` (menu + URL).

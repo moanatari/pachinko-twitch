@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
-import { BOARD_W, PANEL_W, HEIGHT, WIDTH } from '../config';
-import type { GameState, Player } from '../game/state';
+import { params, BOARD_W, PANEL_W, HEIGHT, WIDTH } from '../config';
+import type { GameState } from '../game/state';
+import type { Monthly } from '../game/monthly';
 import type { Theme } from '../themes/types';
 import { avatarKey } from '../twitch/avatars';
 import { NAME_FONT } from './fx';
@@ -8,7 +9,8 @@ import { KANJI_FONT } from '../themes/base';
 
 const hasKanji = (s: string) => /[぀-ヿ一-鿿]/.test(s);
 
-const ROWS = 10;
+export const ROWS = 10;
+type Row = { id: string; name: string; score: number };
 const ROW_H = 54;
 const ROWS_TOP = 288;
 const RENDER_EVERY_MS = 250; // le top 10 n'est recalculé qu'au plus 4 fois par seconde
@@ -44,6 +46,7 @@ export class Hud extends Phaser.Scene {
   private theme?: Theme;
   private ui?: Phaser.GameObjects.Container;
   private timer?: Phaser.GameObjects.Text;
+  private title?: Phaser.GameObjects.Text; // « CLASSEMENT » ou « TOP DU MOIS · <mois> »
   private hint?: Phaser.GameObjects.Text; // « En attente de la première bille »
   private count?: Phaser.GameObjects.Text;
   private ranks: Phaser.GameObjects.Text[] = [];
@@ -107,7 +110,8 @@ export class Hud extends Phaser.Scene {
     }).setOrigin(0.5, 0).setVisible(false);
     ui.add(this.hint);
     ui.add(this.add.rectangle(x0 + 40, 222, PANEL_W - 80, 2, hex(pal.frame)).setOrigin(0));
-    ui.add(this.add.text(x0 + 40, 240, 'CLASSEMENT', { fontFamily: font, fontSize: '22px', color: pal.accent }));
+    this.title = this.add.text(x0 + 40, 240, 'CLASSEMENT', { fontFamily: font, fontSize: '22px', color: pal.accent });
+    ui.add(this.title);
 
     for (let i = 0; i < ROWS; i++) {
       const rank = this.add.text(x0 + 40, slotY(i) + 6, `${i + 1}`, {
@@ -142,7 +146,17 @@ export class Hud extends Phaser.Scene {
   private renderTop() {
     const s = this.state;
     if (!s) return;
-    const top = s.top(ROWS);
+    // top du mois pendant le podium et l'attente de la première bille, classement en direct sinon
+    const m = this.game.registry.get('monthly') as Monthly | undefined;
+    const now = Date.now();
+    // podium : les scores de la partie qui se termine comptent déjà (pas en debug, où rien n'est enregistré)
+    const month = m && (s.phase === 'podium' || s.waiting)
+      ? m.top(ROWS, now, s.phase === 'podium' && !params.debug ? s.players.values() : undefined)
+      : null;
+    const top: Row[] = month ?? s.top(ROWS);
+    this.title?.setText(month
+      ? `TOP DU MOIS · ${new Date(now).toLocaleDateString('fr-FR', { month: 'long' }).toUpperCase()}`
+      : 'CLASSEMENT');
     const inTop = new Set(top.map((p) => p.id));
     for (const l of this.lines) {
       if (l.id && !inTop.has(l.id)) {
@@ -152,7 +166,7 @@ export class Hud extends Phaser.Scene {
         this.tweens.add({ targets: l.c, alpha: 0, x: 40, duration: 300 });
       }
     }
-    top.forEach((p: Player, i) => {
+    top.forEach((p, i) => {
       let l = this.lines.find((x) => x.id === p.id);
       if (!l) {
         l = this.lines.find((x) => x.id === null)!;

@@ -16,10 +16,12 @@ import { updateSettings, loadSettings, saveSettings, type Settings } from '../se
 import { safeStorage } from '../storage';
 import { Bans } from '../game/bans';
 import { History } from '../game/history';
+import { Monthly } from '../game/monthly';
 import { avatarKey, fallbackKey, loadAvatar, clearBallTextures } from '../twitch/avatars';
 import { THEMES } from '../themes/index';
 import type { AdminAction } from '../twitch/chat';
 import { Juice, type Pulse } from './fx';
+import { ROWS } from './Hud';
 
 type Body = MatterJS.BodyType;
 export type ModAction = 'removeBall' | 'resetScore' | 'ban' | 'unban';
@@ -61,6 +63,7 @@ export class Game extends Phaser.Scene {
   private readonly kv = safeStorage();
   readonly bans = new Bans(this.kv);
   readonly history = new History(this.kv);
+  readonly monthly = new Monthly(this.kv);
   streamer: Viewer = STREAMER;
   private disconnect?: () => void;
   private recorded = false; // partie courante déjà entrée dans l'historique
@@ -75,6 +78,7 @@ export class Game extends Phaser.Scene {
 
   async create() {
     this.game.registry.set('state', this.state);
+    this.game.registry.set('monthly', this.monthly);
     this.buildFrame();
     this.matter.world.on('collisionstart', this.onCollision, this);
     // le streamer joue en cliquant sur le plateau (menu ouvert : le calque DOM recouvre le canvas)
@@ -124,6 +128,7 @@ export class Game extends Phaser.Scene {
       if (action === 'ban') {
         this.bans.add({ id, name: this.state.players.get(id)?.name ?? users.get(id)?.name ?? id, at: Date.now() });
         this.state.remove(id);
+        this.monthly.remove(id);
       }
     }
     this.game.events.emit('player', id);
@@ -139,7 +144,17 @@ export class Game extends Phaser.Scene {
       theme: this.theme.id, players: s.players.size,
       top3: s.top(3).map(({ id, name, score }) => ({ id, name, score })),
     });
+    if (!params.debug) this.monthly.record(s.players.values(), Date.now()); // bots et parties de test hors du top
     this.game.events.emit('history');
+  }
+
+  /** Top du mois : bille de repli puis avatar pour les viewers pas encore vus dans cette session. */
+  private warmMonthly() {
+    for (const e of this.monthly.top(ROWS, Date.now())) {
+      if (this.textures.exists(avatarKey(e.id))) continue;
+      fallbackKey(this, e, this.theme.font.family, this.theme.palette.ballRim);
+      this.fetchIdentity(e);
+    }
   }
 
   /** Contrôle de partie (menu et commandes mods). Pendant un chargement : mis en file, rejoué à la fin. */
@@ -226,6 +241,7 @@ export class Game extends Phaser.Scene {
     this.buildMap(generateMap(seed, pattern));
     this.state.start(Date.now(), params.duration * 60_000);
     this.recorded = false;
+    this.warmMonthly();
     this.game.events.emit('phase', 'playing');
   }
 
