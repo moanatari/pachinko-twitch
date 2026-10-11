@@ -1,5 +1,6 @@
 // Réglages du streamer : défauts < sauvegardés (localStorage) < paramètres d'URL (session, jamais sauvegardés). Pur.
 import { readJson, writeJson, type KV } from './storage';
+import { ALL_EFFECTS, normalizeEffects } from './game/specials';
 
 export interface Settings {
   channel: string | null; // login Twitch, minuscules
@@ -8,10 +9,13 @@ export interface Settings {
   theme: string; // 'auto' ou id d'un thème du registre
   shake: boolean;
   autoNext: boolean; // enchaînement automatique des parties
+  specialEvery: number; // secondes entre deux taquets spéciaux, 0 = désactivé
+  specialEffects: string; // ids des effets activés, séparés par des virgules (game/specials.ts)
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   channel: null, duration: 5, maxBalls: 150, theme: 'auto', shake: true, autoNext: true,
+  specialEvery: 20, specialEffects: ALL_EFFECTS,
 };
 const KEY = 'pachinko-settings';
 
@@ -43,6 +47,8 @@ export function sanitizeSettings(raw: unknown, base: Settings): Settings {
     theme: typeof r.theme === 'string' && r.theme ? r.theme : base.theme,
     shake: bool(r.shake, base.shake),
     autoNext: bool(r.autoNext, base.autoNext),
+    specialEvery: num(r.specialEvery, base.specialEvery, 0, 300),
+    specialEffects: typeof r.specialEffects === 'string' ? normalizeEffects(r.specialEffects) : base.specialEffects,
   };
 }
 
@@ -53,7 +59,7 @@ export const saveSettings = (kv: KV | null, s: Settings) => writeJson(kv, KEY, s
 export function mergeSettings(defaults: Settings, saved: unknown, search: string): Settings {
   const q = new URLSearchParams(search);
   const url: Record<string, unknown> = {};
-  for (const k of ['channel', 'duration', 'maxBalls', 'theme'] as const) if (q.has(k)) url[k] = q.get(k);
+  for (const k of ['channel', 'duration', 'maxBalls', 'theme', 'specialEvery', 'specialEffects'] as const) if (q.has(k)) url[k] = q.get(k);
   for (const k of ['shake', 'autoNext'] as const) if (q.has(k)) url[k] = q.get(k) !== '0';
   return sanitizeSettings(url, sanitizeSettings(saved, defaults));
 }

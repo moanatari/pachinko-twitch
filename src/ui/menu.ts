@@ -7,6 +7,7 @@ import { params, WIDTH } from '../config';
 import { THEMES } from '../themes/index';
 import { PATTERNS, type PatternId } from '../mapgen';
 import { normalizeChannel, formPatch } from '../settings';
+import { EFFECTS } from '../game/specials';
 import { users } from '../twitch/users';
 import { mmss } from '../scenes/Hud';
 import type { Game } from '../scenes/Game';
@@ -164,6 +165,8 @@ function init(game: Phaser.Game, g: Game) {
         `<option value="${esc(id)}"${id === params.theme ? ' selected' : ''}>${id === 'auto' ? 'Automatique (date)' : esc(id)}</option>`).join('')}</select></label>
       <label class="menu-check"><input name="shake" type="checkbox"${params.shake ? ' checked' : ''}> Secousses de l'écran</label>
       <label class="menu-check"><input name="autoNext" type="checkbox"${params.autoNext ? ' checked' : ''}> Enchaîner les parties automatiquement</label>
+      <label>Taquets spéciaux : un toutes les (s, 0 = aucun) <input name="specialEvery" type="number" min="0" max="300" value="${params.specialEvery}"></label>
+      ${EFFECTS.map((e) => `<label class="menu-check"><input name="fx-${e.id}" type="checkbox"${params.specialEffects.split(',').includes(e.id) ? ' checked' : ''}> ${esc(e.label)}</label>`).join('')}
     </div>
     <div class="menu-actions">
       <button data-act="save">Enregistrer</button>
@@ -216,6 +219,8 @@ function init(game: Phaser.Game, g: Game) {
       theme: field('theme').value,
       shake: field('shake').checked,
       autoNext: field('autoNext').checked,
+      specialEvery: field('specialEvery').value, // champ vidé : valeur inchangée
+      specialEffects: EFFECTS.filter((e) => field(`fx-${e.id}`).checked).map((e) => e.id).join(','),
     }, params));
     render(); // affiche les valeurs bornées
     setNotice(params.channel ? 'Réglages enregistrés' : 'Entre ta chaîne Twitch');

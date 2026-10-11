@@ -107,7 +107,7 @@ export class Game extends Phaser.Scene {
   isStreamer(id: string) { return id === this.streamer.id || id === STREAMER.id; }
 
   /** Réglages du menu : sauvegardés (sans les surcharges d'URL), puis appliqués.
-   *  Chaîne, plafond, shake : tout de suite ; durée, thème, enchaînement : partie suivante. */
+   *  Chaîne, plafond, shake, taquets spéciaux : tout de suite ; durée, thème, enchaînement : partie suivante. */
   applySettings(patch: Partial<Settings>) {
     saveSettings(this.kv, updateSettings(loadSettings(this.kv), patch));
     const channel = params.channel;

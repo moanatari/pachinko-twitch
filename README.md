@@ -51,7 +51,9 @@ game.scene.getScene('Game').requestDrop({ id: 'v1', name: 'Viewer1', color: '#ff
 | `date` | `?date=2026-10-31` | thème choisi comme si on était à cette date |
 
 Les réglages du menu peuvent aussi être passés dans l'URL pour une session (ils ne sont alors pas
-sauvegardés) : `channel`, `duration` (minutes), `maxBalls`, `shake=0`, `autoNext=0`.
+sauvegardés) : `channel`, `duration` (minutes), `maxBalls`, `shake=0`, `autoNext=0`,
+`specialEvery` (secondes entre deux taquets spéciaux, `0` = aucun), `specialEffects` (effets activés,
+ex. `moon,warp` ; ids : `double`, `moon`, `warp`, `slow`, `x2`, `gold`, `quake`).
 
 ## Jouer avec Twitch
 

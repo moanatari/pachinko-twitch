@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_SETTINGS, loadSettings, saveSettings, mergeSettings, updateSettings, normalizeChannel, formPatch,
 } from './settings';
+import { ALL_EFFECTS } from './game/specials';
 
 const memory = (init: Record<string, string> = {}) => {
   const m = new Map(Object.entries(init));
@@ -22,7 +23,10 @@ describe('loadSettings / saveSettings', () => {
   });
   it('aller-retour', () => {
     const kv = memory();
-    const s = { channel: 'machaine', duration: 3, maxBalls: 80, theme: 'noel', shake: false, autoNext: false };
+    const s = {
+      ...DEFAULT_SETTINGS, channel: 'machaine', duration: 3, maxBalls: 80, theme: 'noel', shake: false, autoNext: false,
+      specialEvery: 45, specialEffects: 'moon,warp',
+    };
     saveSettings(kv, s);
     expect(loadSettings(kv)).toEqual(s);
   });
@@ -84,4 +88,37 @@ describe('formPatch (formulaire du menu)', () => {
     expect(formPatch({ ...form, duration: '', maxBalls: '' }, current)).toEqual({}));
   it('valeurs bornées', () => expect(formPatch({ ...form, maxBalls: '9999' }, current)).toEqual({ maxBalls: 500 }));
   it('chaîne vidée → aucune chaîne', () => expect(formPatch({ ...form, channel: '' }, current)).toEqual({ channel: null }));
+});
+
+describe('taquets spéciaux', () => {
+  it('défauts : un toutes les 20 s, tous les effets', () =>
+    expect(DEFAULT_SETTINGS).toMatchObject({ specialEvery: 20, specialEffects: ALL_EFFECTS }));
+
+  it('specialEvery borné 0–300, 0 = désactivé', () => {
+    expect(updateSettings(DEFAULT_SETTINGS, { specialEvery: 0 }).specialEvery).toBe(0);
+    expect(updateSettings(DEFAULT_SETTINGS, { specialEvery: 9999 }).specialEvery).toBe(300);
+    expect(updateSettings(DEFAULT_SETTINGS, { specialEvery: -5 }).specialEvery).toBe(0);
+  });
+
+  it('specialEffects nettoyé : ids inconnus ignorés, ordre canonique, vide = aucun effet', () => {
+    expect(updateSettings(DEFAULT_SETTINGS, { specialEffects: 'warp,nope,moon' }).specialEffects).toBe('moon,warp');
+    expect(updateSettings(DEFAULT_SETTINGS, { specialEffects: '' }).specialEffects).toBe('');
+  });
+
+  it('valeurs sauvegardées invalides → défauts', () => {
+    const kv = memory({ 'pachinko-settings': JSON.stringify({ specialEvery: 'abc', specialEffects: 42 }) });
+    expect(loadSettings(kv)).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('surcharge d\'URL, ids inconnus ignorés', () => {
+    expect(mergeSettings(DEFAULT_SETTINGS, {}, '?specialEvery=5&specialEffects=moon,nope,warp'))
+      .toMatchObject({ specialEvery: 5, specialEffects: 'moon,warp' });
+    expect(mergeSettings(DEFAULT_SETTINGS, {}, '?specialEffects=').specialEffects).toBe('');
+  });
+
+  it('formPatch : champ vidé inchangé, cases décochées prises en compte', () => {
+    expect(formPatch({ specialEvery: '', specialEffects: 'moon' }, DEFAULT_SETTINGS)).toEqual({ specialEffects: 'moon' });
+    expect(formPatch({ specialEvery: '0', specialEffects: ALL_EFFECTS }, DEFAULT_SETTINGS)).toEqual({ specialEvery: 0 });
+    expect(formPatch({ specialEvery: '20', specialEffects: '' }, DEFAULT_SETTINGS)).toEqual({ specialEffects: '' });
+  });
 });
