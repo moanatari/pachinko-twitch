@@ -50,8 +50,8 @@ check('attente : timer figé avant la première bille', (await page.evaluate(`${
 
 // 2 ter. Top du mois affiché pendant l'attente
 await page.evaluate(`${G}.monthly.record([${entry('42', 777)}], Date.now()); window.game.events.emit('player', '42')`);
-await page.waitForFunction(`${H}.title.text.startsWith('TOP DU MOIS')`);
-check('attente : top du mois affiché', await page.evaluate(`${H}.lines.some((l) => l.id === '42')`));
+await page.waitForFunction(`${H}.lines.some((l) => l.id === '42')`);
+check('attente : top du mois affiché', await page.evaluate(`${H}.title.text.startsWith('TOP DU MOIS')`));
 
 // 3. Pause : timer gelé, drops refusés, billes conservées après une longue pause
 check('drop avant pause', await page.evaluate(`${G}.requestDrop(${viewer('v0')}, 300)`));
