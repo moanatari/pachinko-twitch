@@ -48,6 +48,9 @@ terminée et vérifiée.
 - [x] 10. Les 4 autres patterns de génération
 - [ ] 11. Passe perf et réglages finaux
 - [x] 12. Mode streamer : plein écran, menus, modération, historique (spec `docs/superpowers/specs/2026-10-02-streamer-mode-design.md`, plan `docs/superpowers/plans/2026-10-02-streamer-mode.md`)
+- [x] 13. Timer à la première bille (spec `docs/superpowers/specs/2026-10-11-timer-top-du-mois-taquets-speciaux-design.md`, plan `docs/superpowers/plans/2026-10-11-timer-top-du-mois-taquets-speciaux.md`)
+- [ ] 14. Top du mois (même spec, même plan)
+- [ ] 15. Taquets spéciaux (même spec, même plan)
 
 ## Décisions prises
 | Sujet | Choix |
@@ -635,6 +638,23 @@ ni hausse continue de la mémoire (onglet Memory de Chrome).
       premier lancement → Réglages, chaîne persistée, pause 9 s (timer gelé, bille conservée), exclusion,
       historique après une partie de 1 min, 60 fps menu fermé / 60 fps menu ouvert à 145 billes.
       À vérifier à la main : Échap en plein écran (verrou clavier Chrome ; Firefox : préférer F11).
+
+### 13. Timer à la première bille
+- [x] `GameState` : état d'attente (`waiting`), timer lancé par la première bille ; billes comptées par viewer (`extraBall`).
+- [x] Hud : durée complète figée + « En attente de la première bille ».
+- [x] **Vérif** : `npm run test` et `npm run verify` verts (timer figé avant la première bille).
+
+### 14. Top du mois
+- [ ] `src/game/monthly.ts` : meilleur score par viewer sur le mois civil, persistant, anonymes exclus.
+- [ ] Enregistrement en fin de podium (hors `?debug=1`), retrait à l'exclusion.
+- [ ] Panneau latéral « TOP DU MOIS » pendant le podium et l'attente.
+- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; à la main : record visible dès le podium, conservé après rechargement.
+
+### 15. Taquets spéciaux
+- [ ] Réglages `specialEvery` / `specialEffects` (menu + URL).
+- [ ] `src/game/specials.ts` (catalogue + tirage, pur) et `src/scenes/specials.ts` (taquet allumé, 7 effets).
+- [ ] Texture `pegSpecial` (clé fixe, teintable).
+- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps à `?debug=1&bots=150` ; les 7 effets vus à la main.
 
 ## Vérification
 - `npm run test` : `mapgen.test.ts` (1000 seeds × 5 patterns respectent les règles),

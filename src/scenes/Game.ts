@@ -328,7 +328,7 @@ export class Game extends Phaser.Scene {
   /** Point d'entrée unique des drops (tchat, Heat, souris). Refusé si exclu, bille déjà active, plafond, pause ou podium. */
   requestDrop(viewer: Viewer, x: number): boolean {
     if (!this.map || this.bans.isBanned(viewer.id) || !this.state.canDrop(viewer.id)) return false;
-    this.state.ballStarted(viewer);
+    this.state.ballStarted(viewer, Date.now());
     this.drop(viewer, x);
     this.game.events.emit('drop', viewer);
     return true;

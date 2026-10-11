@@ -40,9 +40,14 @@ await page.reload();
 await page.waitForFunction(`!!${G}?.map`);
 check('chaîne persistée', await page.evaluate(() => JSON.parse(localStorage.getItem('pachinko-settings')).channel) === 'pachinko_test');
 check('2e lancement : menu fermé', !(await page.isVisible('.menu-backdrop')));
+// 2 bis. Timer en attente tant qu'aucune bille n'est jouée
+const w1 = await remaining(page);
+await page.waitForTimeout(1200);
+check('attente : timer figé avant la première bille', (await page.evaluate(`${G}.state.waiting`)) && (await remaining(page)) === w1, `${w1} ms`);
 
 // 3. Pause : timer gelé, drops refusés, billes conservées après une longue pause
 check('drop avant pause', await page.evaluate(`${G}.requestDrop(${viewer('v0')}, 300)`));
+check('première bille : timer lancé', !(await page.evaluate(`${G}.state.waiting`)));
 await page.keyboard.press('Escape');
 await page.click('[data-tab=game]');
 await page.click('[data-act=pause]');

@@ -6,8 +6,11 @@ export interface Player extends Viewer { score: number; scoredAt: number; balls:
 
 export class GameState {
   readonly players = new Map<string, Player>();
-  private readonly active = new Set<string>(); // viewers ayant une bille en jeu
+  private readonly active = new Map<string, number>(); // viewer → billes en jeu (2 avec une bille bonus)
+  private inPlay = 0; // total des billes en jeu, borné par maxBalls
   phase: Phase = 'playing';
+  waiting = false; // carte prête, timer pas encore lancé : aucune bille jouée
+  private durationMs = 0;
   startedAt = 0; // décalé comme endsAt à chaque reprise : endsAt - startedAt = durée jouée
   endsAt = 0;
   private podiumEndsAt = 0;
@@ -17,29 +20,52 @@ export class GameState {
 
   get paused() { return this.pausedAt !== null; }
 
+  /** Nouvelle partie, en attente : le timer ne part qu'à la première bille. */
   start(now: number, durationMs: number) {
     this.players.clear();
     this.active.clear();
+    this.inPlay = 0;
     this.phase = 'playing';
     this.pausedAt = null;
-    this.startedAt = now;
-    this.endsAt = now + durationMs;
+    this.waiting = true;
+    this.durationMs = durationMs;
+    this.startedAt = this.endsAt = now;
   }
 
   canDrop(userId: string): boolean {
-    return this.phase === 'playing' && !this.paused && !this.active.has(userId) && this.active.size < this.maxBalls;
+    return this.phase === 'playing' && !this.paused && !this.active.has(userId) && this.inPlay < this.maxBalls;
   }
 
   hasBall(userId: string) { return this.active.has(userId); }
 
-  ballStarted(v: Viewer) {
-    this.active.add(v.id);
+  ballStarted(v: Viewer, now: number) {
+    if (this.waiting) {
+      this.waiting = false;
+      this.startedAt = now;
+      this.endsAt = now + this.durationMs;
+    }
+    this.active.set(v.id, (this.active.get(v.id) ?? 0) + 1);
+    this.inPlay++;
     const p = this.players.get(v.id);
     if (p) Object.assign(p, { name: v.name, color: v.color, balls: p.balls + 1 });
     else this.players.set(v.id, { ...v, score: 0, scoredAt: 0, balls: 1 });
   }
 
-  ballFinished(userId: string) { this.active.delete(userId); }
+  /** Bille bonus (taquet spécial) : en plus de la bille du viewer, mais sous le plafond global. */
+  extraBall(userId: string): boolean {
+    if (!this.players.has(userId) || this.inPlay >= this.maxBalls) return false;
+    this.active.set(userId, (this.active.get(userId) ?? 0) + 1);
+    this.inPlay++;
+    return true;
+  }
+
+  ballFinished(userId: string) {
+    const n = this.active.get(userId);
+    if (!n) return;
+    this.inPlay--;
+    if (n > 1) this.active.set(userId, n - 1);
+    else this.active.delete(userId);
+  }
 
   /** Nom résolu après coup (lookup réseau d'un viewer venu de Heat). */
   rename(userId: string, name: string) {
@@ -65,9 +91,10 @@ export class GameState {
     if (p) p.score = 0;
   }
 
-  /** Exclusion : le joueur disparaît du classement (sa bille a déjà été retirée par Game). */
+  /** Exclusion : le joueur disparaît du classement (ses billes ont déjà été retirées par Game). */
   remove(userId: string) {
     this.players.delete(userId);
+    this.inPlay -= this.active.get(userId) ?? 0;
     this.active.delete(userId);
   }
 
@@ -86,13 +113,21 @@ export class GameState {
     this.pausedAt = null;
   }
 
-  remainingMs(now: number) { return Math.max(0, this.endsAt - (this.pausedAt ?? now)); }
+  remainingMs(now: number) {
+    return this.waiting ? this.durationMs : Math.max(0, this.endsAt - (this.pausedAt ?? now));
+  }
 
-  endNow(now: number) { this.endsAt = Math.min(this.endsAt, now); }
+  /** En attente : la partie se termine sans avoir commencé (podium vide, durée jouée nulle). */
+  endNow(now: number) {
+    if (this.waiting) {
+      this.waiting = false;
+      this.startedAt = this.endsAt = now;
+    } else this.endsAt = Math.min(this.endsAt, now);
+  }
 
   /** Fait avancer les phases ; renvoie la transition survenue ('next' = lancer une nouvelle partie). */
   tick(now: number): 'podium' | 'next' | null {
-    if (this.paused) return null;
+    if (this.paused || this.waiting) return null;
     if (this.phase === 'playing' && now >= this.endsAt) {
       this.phase = 'podium';
       this.podiumEndsAt = now + this.podiumMs;

@@ -44,6 +44,7 @@ export class Hud extends Phaser.Scene {
   private theme?: Theme;
   private ui?: Phaser.GameObjects.Container;
   private timer?: Phaser.GameObjects.Text;
+  private hint?: Phaser.GameObjects.Text; // « En attente de la première bille »
   private count?: Phaser.GameObjects.Text;
   private ranks: Phaser.GameObjects.Text[] = [];
   private lines: Line[] = [];
@@ -101,6 +102,10 @@ export class Hud extends Phaser.Scene {
     ui.add(this.add.text(cx, 34, 'PACHINKO', { fontFamily: font, fontSize: '40px', color: pal.accent }).setOrigin(0.5, 0));
     this.timer = this.add.text(cx, 96, '', { fontFamily: font, fontSize: '84px', color: pal.text }).setOrigin(0.5, 0);
     ui.add(this.timer);
+    this.hint = this.add.text(cx, 196, 'En attente de la première bille', {
+      fontFamily: NAME_FONT, fontSize: '18px', color: pal.accent,
+    }).setOrigin(0.5, 0).setVisible(false);
+    ui.add(this.hint);
     ui.add(this.add.rectangle(x0 + 40, 222, PANEL_W - 80, 2, hex(pal.frame)).setOrigin(0));
     ui.add(this.add.text(x0 + 40, 240, 'CLASSEMENT', { fontFamily: font, fontSize: '22px', color: pal.accent }));
 
@@ -240,6 +245,7 @@ export class Hud extends Phaser.Scene {
     const s = this.state;
     if (!s || !this.timer) return;
     this.timer.setText(s.phase === 'podium' ? '0:00' : mmss(s.remainingMs(Date.now())));
+    this.hint?.setVisible(s.phase === 'playing' && s.waiting);
     if (this.dirty && time - this.lastRender > RENDER_EVERY_MS) {
       this.dirty = false;
       this.lastRender = time;

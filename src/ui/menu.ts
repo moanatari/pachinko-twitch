@@ -92,7 +92,7 @@ function init(game: Phaser.Game, g: Game) {
   const gameHtml = () => {
     const s = g.state;
     const rows: [string, string][] = [
-      ['Phase', s.paused ? 'En pause' : s.phase === 'playing' ? 'En jeu' : 'Podium'],
+      ['Phase', s.paused ? 'En pause' : s.phase === 'podium' ? 'Podium' : s.waiting ? 'En attente de la première bille' : 'En jeu'],
       ['Temps restant', mmss(s.remainingMs(Date.now()))],
       ['Carte', g.map ? `${g.map.pattern} · seed ${g.map.seed}` : '…'],
       ['Thème', g.theme?.id ?? '…'],
