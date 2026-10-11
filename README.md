@@ -65,9 +65,9 @@ menu ni roue crantée ne sont affichés ; retire ce paramètre pour ouvrir le li
 
 ## Jouer avec Twitch
 
-1. Dans le menu (**Échap** ou roue crantée en bas à droite) → **Réglages** → saisir le login de la chaîne
-   (Entrée ou clic ailleurs pour valider). Chaque réglage est enregistré dès qu'il est modifié, et
-   mémorisé pour les lancements suivants.
+1. Dans le menu (**Échap** ou roue crantée en bas à droite) → **Réglages** → saisir le login de la chaîne,
+   puis **Connecter** (ou Entrée) : l'état passe à « Connecté à #ta_chaine » quand Twitch a répondu.
+   Les autres réglages sont enregistrés dès qu'ils sont modifiés, et mémorisés pour les lancements suivants.
 2. Bouton **Plein écran** (ou F11), puis capturer la fenêtre du navigateur dans OBS.
 3. Pour les clics des viewers : installer l'extension **Heat** sur la chaîne. Le mapping des clics suppose
    un plein écran 16:9.
@@ -110,8 +110,8 @@ npm run verify     # vérification navigateur du mode streamer, avec `npm run de
 ```
 
 `npm run verify` pilote le Chrome installé en headless (Playwright) : premier lancement, réglages
-persistés, pause, exclusion, historique, FPS à 150 billes menu fermé / ouvert. Il se connecte au tchat
-de la chaîne de test `pachinko_test` en lecture anonyme.
+persistés, pause, exclusion, historique, FPS à 150 billes menu fermé / ouvert. Il se connecte en lecture
+anonyme au tchat de la chaîne de test `pachinko_test`, et à `zz` (login inexistant) pour l'état « Aucune réponse ».
 
 ## Pour aller plus loin
 

@@ -51,6 +51,7 @@
 .menu-search { width: 100%; box-sizing: border-box; margin-bottom: 12px; }
 .menu-link { display: flex; gap: 12px; }
 .menu-link input { flex: 1; min-width: 0; }
+.menu-conn { margin: 8px 0 20px; min-height: 1.4em; }
 .menu-table { width: 100%; border-collapse: collapse; }
 .menu-table th { text-align: left; color: var(--accent); font-weight: normal; }
 .menu-table td, .menu-table th { padding: 6px 8px; border-bottom: 1px solid color-mix(in srgb, var(--frame) 40%, transparent); }

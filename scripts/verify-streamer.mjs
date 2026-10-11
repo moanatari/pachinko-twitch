@@ -32,6 +32,14 @@ let page = await open('?debug=1');
 check('premier lancement : menu ouvert', await page.isVisible('.menu-backdrop'));
 check('premier lancement : onglet Réglages', (await page.textContent('.menu-tabs .active')) === 'Réglages');
 check('premier lancement : message', (await page.textContent('.menu-notice')).includes('Entre ta chaîne Twitch'));
+const conn = () => page.evaluate(() => document.querySelector('.menu-conn')?.textContent);
+check('premier lancement : non connecté', (await conn()) === 'Non connecté');
+await page.fill('input[name=channel]', 'bad name');
+await page.click('[data-act=connect]');
+check('chaîne invalide : refusée au bouton Connecter, signalée sous le champ', (await conn()).includes('invalide') && !(await page.evaluate(() => localStorage.getItem('pachinko-settings')))?.includes('bad'));
+await page.keyboard.press('Escape');
+await page.keyboard.press('Escape');
+check('chaîne invalide puis fermeture : message de retour à la réouverture', (await page.textContent('.menu-notice')).includes('Entre ta chaîne Twitch'));
 
 // 1 bis. Le streamer ne peut pas s'exclure, même sous son identité provisoire après l'arrivée du room-id
 check('drop du streamer provisoire', await page.evaluate(`${G}.requestDrop(${G}.streamer, 500)`));
@@ -40,11 +48,23 @@ await page.evaluate(`${G}.setStreamer('999', 'x'); ${G}.moderate('ban', 'streame
 check('streamer provisoire : non excluable', !(await page.evaluate(`${G}.bans.isBanned('streamer')`)));
 check('streamer provisoire : retiré du top du mois', !(await inMonthly(page, 'streamer')));
 
-// 2. Chaîne saisie → persistée après rechargement
-await page.fill('input[name=channel]', 'Pachinko_Test');
-await page.press('input[name=channel]', 'Enter');
+// 2. Chaîne : connectée seulement sur validation (bouton Connecter ou Entrée), puis persistée après rechargement
 const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('pachinko-settings')));
-check('enregistrement auto : sur Entrée, menu resté ouvert', (await saved())?.channel === 'pachinko_test' && await page.isVisible('.menu-backdrop'));
+await page.fill('input[name=channel]', 'Pachinko_Test');
+await page.focus('input[name=duration]'); // quitter le champ ne valide pas
+const waitConn = (test) => page.waitForFunction(`document.querySelector('.menu-conn').textContent${test}`, null, { timeout: 5000 }).then(() => true, () => false);
+check('chaîne : pas connectée en quittant le champ, saisie en attente signalée', !(await saved())?.channel && await waitConn(`.startsWith('Chaîne modifiée')`));
+await page.fill('input[name=channel]', 'zz'); // login trop court pour exister : Twitch ne répondra jamais
+await page.press('input[name=channel]', 'Enter');
+check('chaîne : connectée sur Entrée, menu resté ouvert', (await saved())?.channel === 'zz' && await page.isVisible('.menu-backdrop'));
+check('chaîne : connexion en cours', (await conn()) === 'Connexion à #zz…');
+await page.evaluate(`${G}.connectingSince = 0`);
+check('chaîne : aucune réponse signalée', await waitConn(`.startsWith('Aucune réponse')`));
+await page.fill('input[name=channel]', 'Pachinko_Test');
+await page.click('[data-act=connect]');
+check('chaîne : connectée au bouton, nom normalisé', (await saved()).channel === 'pachinko_test' && (await page.inputValue('input[name=channel]')) === 'pachinko_test');
+await page.evaluate(`${G}.setStreamer('999', 'pachinko_test')`); // room-id reçu du tchat
+check('chaîne : connectée une fois le room-id reçu', await waitConn(` === 'Connecté à #pachinko_test'`));
 check('enregistrement auto : plus de bouton Enregistrer', (await page.locator('[data-act=save]').count()) === 0);
 await page.uncheck('input[name=shake]');
 check('enregistrement auto : case à cocher au clic', (await saved()).shake === false);
@@ -55,7 +75,7 @@ check('enregistrement auto : valeur bornée remise dans le champ', (await page.i
 await page.fill('input[name=channel]', 'bad name');
 await page.fill('input[name=duration]', '7');
 await page.keyboard.press('Escape'); // fermer enregistre la saisie en cours
-check('enregistrement auto : à la fermeture, chaîne invalide ignorée', (await saved()).duration === 7 && (await saved()).channel === 'pachinko_test');
+check('enregistrement auto : à la fermeture, chaîne non validée ignorée', (await saved()).duration === 7 && (await saved()).channel === 'pachinko_test');
 await page.keyboard.press('Escape');
 await page.fill('input[name=duration]', '5');
 await page.click('[data-tab=game]'); // changer d'onglet aussi
@@ -69,9 +89,15 @@ check('lien : adresse de la page, chaîne et réglages', link.startsWith(`${URL}
 await page.click('[data-act=copy-link]');
 await page.waitForFunction(`document.querySelector('.menu-notice').textContent === 'Lien copié'`);
 check('lien : copié dans le presse-papiers', (await page.evaluate(() => navigator.clipboard.readText())) === link);
+await page.fill('input[name=channel]', 'autre');
+await page.click('[data-act=copy-link]');
+await page.waitForFunction(`document.querySelector('.menu-notice').textContent.includes('pas validée')`);
+check('lien : chaîne saisie non validée signalée, absente du lien', (await page.evaluate(() => navigator.clipboard.readText())) === link);
+await page.fill('input[name=duration]', '6'); // saisie en cours : ni Entrée ni sortie du champ
 await page.reload();
 await page.waitForFunction(`!!${G}?.map`);
-check('chaîne persistée', await page.evaluate(() => JSON.parse(localStorage.getItem('pachinko-settings')).channel) === 'pachinko_test');
+check('enregistrement auto : saisie en cours gardée au rechargement', (await saved()).duration === 6);
+check('chaîne persistée', (await saved()).channel === 'pachinko_test');
 check('2e lancement : menu fermé', !(await page.isVisible('.menu-backdrop')));
 // 2 bis. Timer en attente tant qu'aucune bille n'est jouée
 const w1 = await remaining(page);
@@ -174,6 +200,26 @@ await page.close();
 // 5 ter. Lien pour OBS : aucun menu, même sans chaîne
 page = await open('?debug=1&menu=0&channel=');
 check('menu=0 : aucun menu', (await page.locator('.menu-root').count()) === 0);
+await page.close();
+
+// 5 quater. Thème inconnu dans l'URL : ouvrir puis fermer les réglages n'enregistre pas « auto » à sa place
+page = await open('?debug=1&theme=Inconnu');
+await page.evaluate(() => localStorage.setItem('pachinko-settings', JSON.stringify({ ...JSON.parse(localStorage.getItem('pachinko-settings')), theme: 'noel' })));
+await page.keyboard.press('Escape');
+await page.click('[data-tab=settings]');
+await page.keyboard.press('Escape');
+check('thème inconnu : réglage enregistré intact', (await saved()).theme === 'noel');
+await page.evaluate(() => localStorage.setItem('pachinko-settings', JSON.stringify({ ...JSON.parse(localStorage.getItem('pachinko-settings')), theme: 'auto' })));
+await page.close();
+
+// 5 quinquies. Chaîne en surcharge d'URL : « Connecter » l'enregistre, même si c'est déjà celle de la session
+page = await open('?debug=1&channel=zz');
+await page.keyboard.press('Escape');
+await page.click('[data-tab=settings]');
+await page.click('[data-act=connect]');
+check('chaîne d\'URL : enregistrée au bouton Connecter', (await saved()).channel === 'zz');
+await page.fill('input[name=channel]', 'pachinko_test');
+await page.click('[data-act=connect]');
 await page.close();
 
 // 6. FPS à 150 billes, menu fermé puis ouvert

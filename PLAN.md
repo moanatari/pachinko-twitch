@@ -53,6 +53,7 @@ terminée et vérifiée.
 - [x] 15. Taquets spéciaux (même spec, même plan)
 - [x] 16. Fin de partie nette + lien copiable des réglages
 - [x] 17. Réglages enregistrés automatiquement, croix de fermeture, lien OBS sans menu (`menu=0`)
+- [x] 18. Chaîne connectée par un bouton, état de la connexion affiché
 
 ## Décisions prises
 | Sujet | Choix |
@@ -665,6 +666,25 @@ Remplace le cycle de l'étape 5 (billes qui finissaient leur course au ralenti p
       bouton « Copier le lien » dans l'onglet Réglages (source navigateur OBS, GitHub Pages).
 - [x] **Vérif** : `npm run test` et `npm run verify` verts (bille lâchée juste avant 0:00 retirée, score figé, lien copié).
 
+### 17. Réglages enregistrés automatiquement + lien OBS sans menu
+- [x] Onglet Réglages : plus de bouton « Enregistrer », chaque champ est enregistré au `change`, à la
+      fermeture, au changement d'onglet et au rechargement de la page ; chaîne invalide ignorée, le reste est enregistré.
+- [x] « Nouvelle partie maintenant » : immédiat avant la première bille, deux clics si la partie a commencé.
+- [x] Croix de fermeture du menu ; `menu=0` (ajouté au lien copiable) : ni menu ni roue crantée.
+- [x] Captures d'écran dans le README (`docs/screenshots/`).
+- [x] **Vérif** : `npm run test` et `npm run verify` verts (2026-10-12, 56/56 OK, 158 fps à 150 billes).
+
+### 18. Chaîne connectée par un bouton + état de la connexion
+Revient sur un point de l'étape 17 : la chaîne enregistrée en quittant le champ connectait le jeu au tchat
+d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end` / `skip`).
+- [x] La chaîne sort de l'enregistrement automatique : bouton « Connecter » ou Entrée ; champ vidé = déconnexion ;
+      saisie non validée abandonnée à la fermeture.
+- [x] État à côté du champ : « Non connecté », « Connexion à #… », « Aucune réponse : vérifie le nom de la
+      chaîne ou ta connexion Internet » après 5 s, « Chaîne modifiée… » tant que la saisie n'est pas validée,
+      nom invalide signalé au même endroit, « Connecté à #… » une fois le `room-id` reçu (`Game.connected`).
+- ⚠️ L'état ne retombe pas si la socket se coupe en cours de stream (reconnexion automatique, non affichée).
+- [x] **Vérif** : `npm run test` et `npm run verify` verts.
+
 ## Vérification
 - `npm run test` : `mapgen.test.ts` (1000 seeds × 5 patterns respectent les règles),
   `chat.test.ts` (parse de lignes IRC réelles avec tags) et `themes/resolve.test.ts`
@@ -681,12 +701,3 @@ Remplace le cycle de l'étape 5 (billes qui finissaient leur course au ralenti p
 - Token Helix en fallback si l'API Heat de lookup tombe.
 - Sons (Phaser les gère nativement : facile à ajouter plus tard).
 - Calibration de zone si la source OBS n'est pas plein écran.
-
-
-### 17. Réglages enregistrés automatiquement + lien OBS sans menu
-- [x] Onglet Réglages : plus de bouton « Enregistrer », chaque champ est enregistré au `change`, à la
-      fermeture et au changement d'onglet ; chaîne invalide ignorée, le reste est enregistré.
-- [x] « Nouvelle partie maintenant » : immédiat avant la première bille, deux clics si la partie a commencé.
-- [x] Croix de fermeture du menu ; `menu=0` (ajouté au lien copiable) : ni menu ni roue crantée.
-- [x] Captures d'écran dans le README (`docs/screenshots/`).
-- [x] **Vérif** : `npm run test` et `npm run verify` verts (2026-10-12, 53/53 OK, 158 fps à 148 billes).

@@ -19,7 +19,10 @@ const TABS: [Tab, string][] = [['game', 'Partie'], ['players', 'Joueurs'], ['his
 const REFRESH_MS = 500; // au plus 2×/s, menu ouvert seulement
 const CURSOR_HIDE_MS = 3000;
 const CONFIRM_MS = 3000;
+const NO_REPLY_MS = 5000; // Twitch ne répond rien pour une chaîne inexistante
 const INVALID_CHANNEL = 'Nom de chaîne invalide (lettres, chiffres et _ uniquement)';
+const NO_CHANNEL = 'Entre ta chaîne Twitch';
+const APPLY_NOW = 'Nouvelle partie maintenant';
 const fr = (n: number) => n.toLocaleString('fr-FR');
 
 export function createMenu(game: Phaser.Game) {
@@ -159,13 +162,28 @@ function init(game: Phaser.Game, g: Game) {
 
   const obsLink = () => `${location.href.split(/[?#]/)[0]}?${settingsQuery(params)}&menu=0`;
 
+  const connText = () => {
+    const c = params.channel;
+    const typed = normalizeChannel(field('channel').value);
+    if (typed === undefined) return INVALID_CHANNEL;
+    if (typed !== c) return 'Chaîne modifiée : « Connecter » ou Entrée pour valider'; // sinon abandonnée sans un mot à la fermeture
+    if (!c) return 'Non connecté';
+    if (g.connected) return `Connecté à #${c}`;
+    return Date.now() - g.connectingSince > NO_REPLY_MS ? 'Aucune réponse : vérifie le nom de la chaîne ou ta connexion Internet' : `Connexion à #${c}…`;
+  };
+
   const settingsHtml = () => `
     <p class="menu-notice">${esc(notice)}</p>
+    <h3>Chaîne Twitch</h3>
+    <div class="menu-link">
+      <input name="channel" aria-label="Chaîne Twitch" value="${esc(params.channel ?? '')}" placeholder="ta_chaine" spellcheck="false" autocomplete="off">
+      <button data-act="connect">Connecter</button>
+    </div>
+    <p class="menu-conn" aria-live="polite"></p>
     <div class="menu-form">
-      <label>Chaîne Twitch <input name="channel" value="${esc(params.channel ?? '')}" placeholder="ta_chaine" spellcheck="false" autocomplete="off"></label>
       <label>Durée d'une partie (min) <input name="duration" type="number" min="1" max="60" value="${params.duration}"></label>
       <label>Billes en jeu (max) <input name="maxBalls" type="number" min="1" max="500" value="${params.maxBalls}"></label>
-      <label>Thème <select name="theme">${['auto', ...Object.keys(THEMES)].map((id) =>
+      <label>Thème <select name="theme">${[...new Set(['auto', ...Object.keys(THEMES), params.theme])].map((id) => // id inconnu (URL, ancien réglage) : listé, sinon la liste retomberait sur « auto » et l'enregistrerait
         `<option value="${esc(id)}"${id === params.theme ? ' selected' : ''}>${id === 'auto' ? 'Automatique (date)' : esc(id)}</option>`).join('')}</select></label>
       <label class="menu-check"><input name="shake" type="checkbox"${params.shake ? ' checked' : ''}> Secousses de l'écran</label>
       <label class="menu-check"><input name="autoNext" type="checkbox"${params.autoNext ? ' checked' : ''}> Enchaîner les parties automatiquement</label>
@@ -173,10 +191,10 @@ function init(game: Phaser.Game, g: Game) {
       ${EFFECTS.map((e) => `<label class="menu-check"><input name="fx-${e.id}" type="checkbox"${params.specialEffects.split(',').includes(e.id) ? ' checked' : ''}> ${esc(e.label)}</label>`).join('')}
     </div>
     <div class="menu-actions">
-      <button data-act="apply-now">Nouvelle partie maintenant</button>
+      <button data-act="apply-now">${APPLY_NOW}</button>
       <button data-act="fullscreen">Plein écran</button>
     </div>
-    <p class="menu-hint">Les changements sont enregistrés automatiquement. Durée, thème et enchaînement prennent effet à la partie suivante : « Nouvelle partie maintenant » n'attend pas, mais coupe la partie en cours et ses scores sont perdus (deux clics pour confirmer).</p>
+    <p class="menu-hint">Les changements sont enregistrés automatiquement, sauf la chaîne : « Connecter » ou Entrée. Durée, thème et enchaînement prennent effet à la partie suivante : « ${APPLY_NOW} » n'attend pas, mais coupe la partie en cours et ses scores sont perdus (deux clics pour confirmer).</p>
     <h3>Lien pour OBS (sans menu)</h3>
     <div class="menu-link">
       <input name="link" readonly aria-label="Lien pour OBS (sans menu)" value="${esc(obsLink())}">
@@ -187,7 +205,6 @@ function init(game: Phaser.Game, g: Game) {
     <div class="menu-live"></div>`;
 
   function render() {
-    if (notice === INVALID_CHANNEL) notice = ''; // formulaire reconstruit depuis les réglages : la saisie invalide a disparu
     for (const b of root.querySelectorAll<HTMLElement>('[data-tab]')) b.classList.toggle('active', b.dataset.tab === tab);
     body.innerHTML = tab === 'settings' ? settingsHtml()
       : tab === 'players' ? `<input class="menu-search" placeholder="Rechercher un joueur" value="${esc(search)}"><div class="menu-live"></div>`
@@ -199,7 +216,10 @@ function init(game: Phaser.Game, g: Game) {
     const live = body.querySelector('.menu-live');
     if (!open || !live) return;
     const now = body.querySelector('[data-act="apply-now"]'); // hors de la partie « live » : libellé rafraîchi à part
-    if (now) now.textContent = label('apply-now', 'Nouvelle partie maintenant');
+    if (now) now.textContent = label('apply-now', APPLY_NOW);
+    const conn = body.querySelector('.menu-conn');
+    const status = conn ? connText() : '';
+    if (conn && conn.textContent !== status) conn.textContent = status; // aria-live : pas de réécriture à texte identique
     live.innerHTML = tab === 'game' ? gameHtml() : tab === 'players' ? playersHtml() : tab === 'history' ? historyHtml() : bansHtml();
   }
 
@@ -220,14 +240,14 @@ function init(game: Phaser.Game, g: Game) {
     if (el) el.textContent = text;
   }
 
+  const field = (name: string) => body.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
+
   /** Enregistrement automatique : à chaque `change`, et avant toute action ou fermeture (saisie en cours).
-   *  Ne sauvegarde que les champs modifiés : une surcharge d'URL laissée telle quelle n'est jamais persistée. */
+   *  Ne sauvegarde que les champs modifiés : une surcharge d'URL laissée telle quelle n'est jamais persistée.
+   *  La chaîne n'en fait pas partie : un nom à moitié tapé connecterait le jeu au tchat d'un autre (voir `connect`). */
   function save() {
     if (!open || tab !== 'settings') return;
-    const field = (name: string) => body.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
-    const invalid = normalizeChannel(field('channel').value) === undefined;
     const patch = formPatch({
-      channel: field('channel').value, // invalide : chaîne inchangée, le reste est enregistré
       duration: field('duration').value, // champ vidé : valeur inchangée
       maxBalls: field('maxBalls').value,
       theme: field('theme').value,
@@ -240,10 +260,18 @@ function init(game: Phaser.Game, g: Game) {
     if (changed) g.applySettings(patch);
     // valeurs bornées et lien remis à jour sur place : redessiner le formulaire ferait perdre le focus
     for (const k of ['duration', 'maxBalls', 'specialEvery'] as const) field(k).value = String(params[k]);
-    if (!invalid) field('channel').value = params.channel ?? '';
     field('link').value = obsLink();
-    if (invalid) setNotice(INVALID_CHANNEL);
-    else if (changed || notice === INVALID_CHANNEL) setNotice(params.channel ? 'Réglages enregistrés' : 'Entre ta chaîne Twitch');
+    if (changed) setNotice(params.channel ? 'Réglages enregistrés' : NO_CHANNEL);
+  }
+
+  /** Chaîne validée par un geste volontaire (bouton ou Entrée) ; champ vidé = déconnexion. */
+  function connect() {
+    const channel = normalizeChannel(field('channel').value);
+    if (channel === undefined) return; // signalé sous le champ (connText)
+    g.applySettings({ channel }); // même chaîne qu'en surcharge d'URL : enregistrée quand même ; ne reconnecte que si elle change
+    field('channel').value = channel ?? '';
+    field('link').value = obsLink();
+    setNotice(channel ? 'Réglages enregistrés' : NO_CHANNEL);
   }
 
   /** Presse-papiers indisponible ou refusé : le champ reste sélectionnable à la main. */
@@ -251,7 +279,8 @@ function init(game: Phaser.Game, g: Game) {
     const link = body.querySelector<HTMLInputElement>('[name="link"]')!.value;
     const failed = () => setNotice('Copie impossible : sélectionne le lien et copie-le à la main');
     if (!navigator.clipboard) return failed();
-    navigator.clipboard.writeText(link).then(() => setNotice('Lien copié'), failed);
+    const pending = normalizeChannel(field('channel').value) !== params.channel; // le lien porte la chaîne connectée, pas la saisie
+    navigator.clipboard.writeText(link).then(() => setNotice(pending ? 'Lien copié, mais la chaîne saisie n\'est pas validée (« Connecter »)' : 'Lien copié'), failed);
   }
 
   function toggleFullscreen() {
@@ -286,6 +315,7 @@ function init(game: Phaser.Game, g: Game) {
       case 'clear-history': if (confirmed('clear-history')) g.history.clear(); break;
       // partie commencée (première bille jouée) : ses scores seraient perdus, confirmation en deux clics
       case 'apply-now': if (g.state.phase !== 'playing' || g.state.waiting || confirmed('apply-now')) g.admin('skip'); break;
+      case 'connect': connect(); break;
       case 'copy-link': return copyLink();
       case 'fullscreen': return toggleFullscreen();
     }
@@ -308,8 +338,14 @@ function init(game: Phaser.Game, g: Game) {
     search = t.value;
     refreshLive();
   });
-  // cases et listes : au clic ; texte et nombres : en quittant le champ ou sur Entrée (pas à chaque touche : la chaîne reconnecte le tchat)
+  // cases et listes : au clic ; nombres : en quittant le champ ou sur Entrée
   body.addEventListener('change', save);
+  body.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || (e.target as HTMLInputElement).name !== 'channel') return;
+    connect();
+    refreshLive();
+  });
+  window.addEventListener('pagehide', save); // rechargement ou fermeture pendant une saisie : ni `change` ni fermeture du menu
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || e.repeat) return;
     e.preventDefault();
@@ -319,7 +355,7 @@ function init(game: Phaser.Game, g: Game) {
   // premier lancement : aucune chaîne ni en réglages ni en URL → le menu guide la saisie (le jeu tourne déjà)
   if (!params.channel) {
     tab = 'settings';
-    notice = 'Entre ta chaîne Twitch';
+    notice = NO_CHANNEL;
     setOpen(true);
   }
 }

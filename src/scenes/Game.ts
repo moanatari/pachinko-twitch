@@ -68,6 +68,7 @@ export class Game extends Phaser.Scene {
   readonly history = new History(this.kv);
   readonly monthly = new Monthly(this.kv);
   streamer: Viewer = STREAMER;
+  connectingSince = Date.now(); // dernière (re)connexion : le menu signale une chaîne qui ne répond pas
   private disconnect?: () => void;
   private recorded = false; // partie courante déjà entrée dans l'historique
   private loading = false;
@@ -100,8 +101,13 @@ export class Game extends Phaser.Scene {
     this.disconnect?.();
     this.disconnect = undefined;
     this.streamer = STREAMER;
+    this.connectingSince = Date.now();
     if (params.channel) this.disconnect = connectTwitch(this, params.channel);
   }
+
+  /** Le tchat a confirmé la chaîne (room-id reçu). shortcut: ne retombe pas si la socket se coupe ensuite
+   *  (elle se reconnecte seule) ; à brancher sur socket.ts si l'état doit suivre les coupures. */
+  get connected() { return this.streamer !== STREAMER; }
 
   /** room-id reçu du tchat : nom et avatar résolus par users.resolve au premier drop. */
   setStreamer(roomId: string, login: string) {
