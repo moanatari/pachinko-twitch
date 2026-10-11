@@ -19,6 +19,12 @@ Aucun backend, aucun token Twitch.
 - `npm run test` — vitest (mapgen, réglages, état, bans, historique, top du mois, taquets spéciaux, parse IRC)
 - `npm run verify` — vérification navigateur du mode streamer (Playwright sur le Chrome installé, dev server lancé)
 
+## Git
+`main` = production : chaque push déploie sur GitHub Pages (`pages.yml`, tests puis build). Ne jamais y pousser directement.
+- Une branche courte par étape du PLAN (`feat/…`, `fix/…`, `ci/…`), créée depuis `main` à jour.
+- `npm run test` et `npm run verify` verts en local (verify ne tourne pas en CI : Chrome installé + Twitch en direct).
+- `gh pr create --fill`, attendre la CI (`ci.yml` : tests + build), puis `gh pr merge --squash --delete-branch`.
+
 ## Architecture
 - `src/mapgen.ts` : génération procédurale **pure** (seed → éléments). Ne jamais importer Phaser ici.
 - `src/game/state.ts` : source de vérité joueurs/scores/billes actives/phase/pause.
