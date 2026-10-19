@@ -43,6 +43,42 @@ export const drawPegGolden: DrawFn = (ctx, w, _h, p) => {
   disc(ctx, r, r, r * 0.98);
 };
 
+/** Taquet à 5 : chrome. */
+export const drawPegChrome: DrawFn = (ctx, w, _h, p) => {
+  const r = w / 2;
+  const g = ctx.createRadialGradient(r * 0.7, r * 0.6, r * 0.1, r, r, r);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.35, p.bumperRing);
+  g.addColorStop(1, '#3a3f48');
+  ctx.fillStyle = g;
+  disc(ctx, r, r, r * 0.95);
+};
+
+/** Taquet à 30 : rouge laqué cerclé d'or. */
+export const drawPegRed: DrawFn = (ctx, w, _h, p) => {
+  const r = w / 2;
+  ctx.fillStyle = p.accent;
+  disc(ctx, r, r, r * 0.98);
+  const g = ctx.createRadialGradient(r * 0.7, r * 0.6, r * 0.05, r, r, r * 0.8);
+  g.addColorStop(0, '#ffd0d0');
+  g.addColorStop(0.35, p.bumperCore);
+  g.addColorStop(1, '#3a0008');
+  ctx.fillStyle = g;
+  disc(ctx, r, r, r * 0.8);
+};
+
+/** Taquet à 50 : blanc éclatant (le gros halo fait le reste). */
+export const drawPegBright: DrawFn = (ctx, w) => {
+  const r = w / 2;
+  const g = ctx.createRadialGradient(r * 0.7, r * 0.6, 0, r, r, r);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.6, '#fff8e0');
+  g.addColorStop(0.9, '#ffe9a8');
+  g.addColorStop(1, '#ffffff');
+  ctx.fillStyle = g;
+  disc(ctx, r, r, r * 0.98);
+};
+
 /** Taquet spécial : perle blanche à liseré, teintée à l'usage de la couleur de l'effet. */
 export const drawPegSpecial: DrawFn = (ctx, w) => {
   const r = w / 2;

@@ -133,10 +133,11 @@ export class Juice {
       .setTint(points >= 10 ? this.colors.accent : this.colors.text);
   }
 
-  peg(p: Pulse, x: number, y: number, golden: boolean) {
+  /** Étincelles proportionnelles aux points : dorées à partir de 10. */
+  peg(p: Pulse, x: number, y: number, points: number) {
     this.pulse(p);
-    if (golden) this.golden.explode(10, x, y);
-    else this.sparks.explode(4, x, y);
+    if (points >= 10) this.golden.explode(points >= 50 ? 28 : points >= 30 ? 18 : 10, x, y);
+    else this.sparks.explode(points >= 5 ? 7 : 4, x, y);
   }
 
   bumper(p: Pulse, x: number, y: number) {

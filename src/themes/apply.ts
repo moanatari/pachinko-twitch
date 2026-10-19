@@ -2,6 +2,7 @@
 import Phaser from 'phaser';
 import type { Theme, SpriteSource, DrawFn } from './types';
 import * as D from './draw';
+import type { PegValue } from '../mapgen';
 import { KANJI_FONT } from './base';
 import { PEG_R, BUMPER_R, SPINNER_R, BALL_R, RAMP_THICK, BOARD_W, HEIGHT } from '../config';
 
@@ -11,6 +12,7 @@ const square = (r: number): [number, number] => [r * 2 * TEX_SCALE, r * 2 * TEX_
 const SIZES: Record<string, [number, number]> = {
   peg: square(PEG_R),
   pegGolden: square(PEG_R),
+  peg5: square(PEG_R), peg30: square(PEG_R), peg50: square(PEG_R),
   pegSpecial: square(PEG_R),
   bumper: square(BUMPER_R),
   spinner: square(SPINNER_R),
@@ -29,6 +31,7 @@ const SIZES: Record<string, [number, number]> = {
 const DEFAULTS: Record<string, DrawFn> = {
   peg: D.drawPeg,
   pegGolden: D.drawPegGolden,
+  peg5: D.drawPegChrome, peg30: D.drawPegRed, peg50: D.drawPegBright,
   pegSpecial: D.drawPegSpecial,
   bumper: D.drawBumper,
   spinner: D.drawSpinner,
@@ -43,6 +46,9 @@ const DEFAULTS: Record<string, DrawFn> = {
   'fx-glow': D.drawSpark,
   ambient: D.drawSpark,
 };
+
+/** Texture de chaque palier de taquet (le 10 garde l'ancienne clé du taquet doré). */
+export const PEG_TEX: Record<PegValue, string> = { 1: 'peg', 5: 'peg5', 10: 'pegGolden', 30: 'peg30', 50: 'peg50' };
 
 export async function applyTheme(scene: Phaser.Scene, theme: Theme): Promise<void> {
   const sources: Record<string, SpriteSource | null | undefined> = {
