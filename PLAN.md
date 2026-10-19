@@ -60,7 +60,7 @@ terminée et vérifiée.
 - [x] 22. Couloir du bas (même spec, même plan)
 - [x] 23. Bacs qui défilent (même spec, même plan)
 - [x] 24. Billes d'animation pendant l'attente (même spec, même plan)
-- [ ] 25. Réglages en sous-onglets, onglet « À propos », version automatique (même plan)
+- [x] 25. Réglages en sous-onglets, onglet « À propos », version automatique (même plan)
 
 ## Décisions prises
 | Sujet | Choix |
@@ -732,10 +732,11 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
       À valider à l'œil sur `dev` : chute des billes d'animation, gel puis éclatement à la première vraie bille.
 
 ### 25. Réglages en sous-onglets, « À propos », version automatique
-- [ ] Version `majeur.mineur.<nombre de commits>` + commit + date, injectée au build (`vite.config.ts`, `__BUILD__`) ; `pages.yml` en `fetch-depth: 0`.
-- [ ] Réglages : sous-onglets Chaîne · Partie · Effets · Exclus (bascule de visibilité, enregistrement auto inchangé).
-- [ ] Onglet « À propos » : version, langages, technos et versions installées, lien vers le dépôt GitHub.
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; version visible sur la GitHub Page après déploiement.
+- [x] Version `majeur.mineur.<nombre de commits>` + commit + date, injectée au build (`vite.config.ts`, `__BUILD__`) ; `pages.yml` en `fetch-depth: 0`.
+- [x] Réglages : sous-onglets Chaîne · Partie · Effets · Exclus (bascule de visibilité, enregistrement auto inchangé).
+- [x] Onglet « À propos » : version, langages, technos et versions installées, lien vers le dépôt GitHub.
+- [x] **Vérif** : `npm run test` (268) et `npm run verify` verts ; version `v0.1.53` dans le bundle.
+- [ ] Après la mise en production : « À propos » de la GitHub Page affiche la version sans « (dev) », dernier chiffre = nombre de commits de `main`.
 
 ## Vérification
 - `npm run test` : `mapgen.test.ts` (1000 seeds × 5 patterns respectent les règles),

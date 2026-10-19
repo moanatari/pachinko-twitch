@@ -13,9 +13,14 @@ import { mmss } from '../scenes/Hud';
 import type { Game } from '../scenes/Game';
 import type { Theme } from '../themes/types';
 import { esc, safeColor, safeImage } from './html';
+import { aboutHtml } from './about';
 
-type Tab = 'game' | 'players' | 'history' | 'settings';
-const TABS: [Tab, string][] = [['game', 'Partie'], ['players', 'Joueurs'], ['history', 'Historique'], ['settings', 'Réglages']];
+type Tab = 'game' | 'players' | 'history' | 'settings' | 'about';
+const TABS: [Tab, string][] = [
+  ['game', 'Partie'], ['players', 'Joueurs'], ['history', 'Historique'], ['settings', 'Réglages'], ['about', 'À propos'],
+];
+type Sub = 'channel' | 'play' | 'fx' | 'bans';
+const SUBS: [Sub, string][] = [['channel', 'Chaîne'], ['play', 'Partie'], ['fx', 'Effets'], ['bans', 'Exclus']];
 const REFRESH_MS = 500; // au plus 2×/s, menu ouvert seulement
 const CURSOR_HIDE_MS = 3000;
 const CONFIRM_MS = 3000;
@@ -47,6 +52,7 @@ function init(game: Phaser.Game, g: Game) {
   const body = root.querySelector<HTMLElement>('.menu-body')!;
 
   let tab: Tab = 'game';
+  let sub: Sub = 'channel'; // sous-onglet des réglages, gardé à la réouverture
   let open = false;
   let notice = '';
   let search = '';
@@ -173,46 +179,65 @@ function init(game: Phaser.Game, g: Game) {
   };
 
   const settingsHtml = () => `
+    <nav class="menu-subtabs">${SUBS.map(([id, label]) => `<button data-sub="${id}">${label}</button>`).join('')}</nav>
     <p class="menu-notice">${esc(notice)}</p>
-    <h3>Chaîne Twitch</h3>
-    <div class="menu-link">
-      <input name="channel" aria-label="Chaîne Twitch" value="${esc(params.channel ?? '')}" placeholder="ta_chaine" spellcheck="false" autocomplete="off">
-      <button data-act="connect">Connecter</button>
-    </div>
-    <p class="menu-conn" aria-live="polite"></p>
-    <div class="menu-form">
-      <label>Durée d'une partie (min) <input name="duration" type="number" min="1" max="60" value="${params.duration}"></label>
-      <label>Billes en jeu (max) <input name="maxBalls" type="number" min="1" max="500" value="${params.maxBalls}"></label>
-      <label>Thème <select name="theme">${[...new Set(['auto', ...Object.keys(THEMES), params.theme])].map((id) => // id inconnu (URL, ancien réglage) : listé, sinon la liste retomberait sur « auto » et l'enregistrerait
-        `<option value="${esc(id)}"${id === params.theme ? ' selected' : ''}>${id === 'auto' ? 'Automatique (date)' : esc(id)}</option>`).join('')}</select></label>
-      <label class="menu-check"><input name="shake" type="checkbox"${params.shake ? ' checked' : ''}> Secousses de l'écran</label>
-      <label class="menu-check"><input name="autoNext" type="checkbox"${params.autoNext ? ' checked' : ''}> Enchaîner les parties automatiquement</label>
-      <label class="menu-check"><input name="lane" type="checkbox"${params.lane ? ' checked' : ''}> Couloir mobile au-dessus des bacs</label>
-      <label class="menu-check"><input name="attract" type="checkbox"${params.attract ? ' checked' : ''}> Billes d'animation en attendant un joueur</label>
-      <label>Taquets spéciaux : un toutes les (s, 0 = aucun) <input name="specialEvery" type="number" min="0" max="300" value="${params.specialEvery}"></label>
-      ${EFFECTS.map((e) => `<label class="menu-check"><input name="fx-${e.id}" type="checkbox"${params.specialEffects.split(',').includes(e.id) ? ' checked' : ''}> ${esc(e.label)}</label>`).join('')}
-      <label>Défilement des bacs <select name="binScroll">${[...new Set([0, 30, 60, params.binScroll])].map((s) => // valeur d'URL hors liste : affichée, sinon fermer le menu la remplacerait
-        `<option value="${s}"${s === params.binScroll ? ' selected' : ''}>${s === 0 ? 'Désactivé' : s % 60 === 0 ? `Toutes les ${s / 60} min` : `Toutes les ${s} s`}</option>`).join('')}</select></label>
-    </div>
-    <div class="menu-actions">
-      <button data-act="apply-now">${APPLY_NOW}</button>
-      <button data-act="fullscreen">Plein écran</button>
-    </div>
-    <p class="menu-hint">Les changements sont enregistrés automatiquement, sauf la chaîne : « Connecter » ou Entrée. Durée, thème, couloir et enchaînement prennent effet à la partie suivante : « ${APPLY_NOW} » n'attend pas, mais coupe la partie en cours et ses scores sont perdus (deux clics pour confirmer).</p>
-    <h3>Lien pour OBS (sans menu)</h3>
-    <div class="menu-link">
-      <input name="link" readonly aria-label="Lien pour OBS (sans menu)" value="${esc(obsLink())}">
-      <button data-act="copy-link">Copier le lien</button>
-    </div>
-    <p class="menu-hint">À coller dans une source navigateur OBS : le menu n'y apparaît pas. Il reprend les réglages ci-dessus.</p>
-    <h3>Joueurs exclus</h3>
-    <div class="menu-live"></div>`;
+    <section data-group="channel">
+      <h3>Chaîne Twitch</h3>
+      <div class="menu-link">
+        <input name="channel" aria-label="Chaîne Twitch" value="${esc(params.channel ?? '')}" placeholder="ta_chaine" spellcheck="false" autocomplete="off">
+        <button data-act="connect">Connecter</button>
+      </div>
+      <p class="menu-conn" aria-live="polite"></p>
+      <h3>Lien pour OBS (sans menu)</h3>
+      <div class="menu-link">
+        <input name="link" readonly aria-label="Lien pour OBS (sans menu)" value="${esc(obsLink())}">
+        <button data-act="copy-link">Copier le lien</button>
+      </div>
+      <p class="menu-hint">La chaîne est enregistrée avec « Connecter » ou Entrée. Le lien est à coller dans une source navigateur OBS : le menu n'y apparaît pas. Il reprend tous les réglages.</p>
+    </section>
+    <section data-group="play">
+      <div class="menu-form">
+        <label>Durée d'une partie (min) <input name="duration" type="number" min="1" max="60" value="${params.duration}"></label>
+        <label>Billes en jeu (max) <input name="maxBalls" type="number" min="1" max="500" value="${params.maxBalls}"></label>
+        <label>Défilement des bacs <select name="binScroll">${[...new Set([0, 30, 60, params.binScroll])].map((s) => // valeur d'URL hors liste : affichée, sinon fermer le menu la remplacerait
+          `<option value="${s}"${s === params.binScroll ? ' selected' : ''}>${s === 0 ? 'Désactivé' : s % 60 === 0 ? `Toutes les ${s / 60} min` : `Toutes les ${s} s`}</option>`).join('')}</select></label>
+        <label class="menu-check"><input name="autoNext" type="checkbox"${params.autoNext ? ' checked' : ''}> Enchaîner les parties automatiquement</label>
+        <label class="menu-check"><input name="lane" type="checkbox"${params.lane ? ' checked' : ''}> Couloir mobile au-dessus des bacs</label>
+        <label class="menu-check"><input name="attract" type="checkbox"${params.attract ? ' checked' : ''}> Billes d'animation en attendant un joueur</label>
+      </div>
+      <div class="menu-actions">
+        <button data-act="apply-now">${APPLY_NOW}</button>
+        <button data-act="fullscreen">Plein écran</button>
+      </div>
+      <p class="menu-hint">Les changements sont enregistrés automatiquement. Durée, thème, couloir et enchaînement prennent effet à la partie suivante : « ${APPLY_NOW} » n'attend pas, mais coupe la partie en cours et ses scores sont perdus (deux clics pour confirmer).</p>
+    </section>
+    <section data-group="fx">
+      <div class="menu-form">
+        <label>Thème <select name="theme">${[...new Set(['auto', ...Object.keys(THEMES), params.theme])].map((id) => // id inconnu (URL, ancien réglage) : listé, sinon la liste retomberait sur « auto » et l'enregistrerait
+          `<option value="${esc(id)}"${id === params.theme ? ' selected' : ''}>${id === 'auto' ? 'Automatique (date)' : esc(id)}</option>`).join('')}</select></label>
+        <label class="menu-check"><input name="shake" type="checkbox"${params.shake ? ' checked' : ''}> Secousses de l'écran</label>
+        <label>Taquets spéciaux : un toutes les (s, 0 = aucun) <input name="specialEvery" type="number" min="0" max="300" value="${params.specialEvery}"></label>
+        ${EFFECTS.map((e) => `<label class="menu-check"><input name="fx-${e.id}" type="checkbox"${params.specialEffects.split(',').includes(e.id) ? ' checked' : ''}> ${esc(e.label)}</label>`).join('')}
+      </div>
+    </section>
+    <section data-group="bans">
+      <h3>Joueurs exclus</h3>
+      <div class="menu-live"></div>
+    </section>`;
+
+  /** Sous-onglet des réglages : simple bascule de visibilité, sans re-rendu (les saisies en cours restent). */
+  function showSub() {
+    for (const s of body.querySelectorAll<HTMLElement>('[data-group]')) s.hidden = s.dataset.group !== sub;
+    for (const b of body.querySelectorAll<HTMLElement>('[data-sub]')) b.classList.toggle('active', b.dataset.sub === sub);
+  }
 
   function render() {
     for (const b of root.querySelectorAll<HTMLElement>('[data-tab]')) b.classList.toggle('active', b.dataset.tab === tab);
     body.innerHTML = tab === 'settings' ? settingsHtml()
+      : tab === 'about' ? aboutHtml()
       : tab === 'players' ? `<input class="menu-search" placeholder="Rechercher un joueur" value="${esc(search)}"><div class="menu-live"></div>`
         : '<div class="menu-live"></div>';
+    showSub();
     refreshLive();
   }
 
@@ -331,10 +356,13 @@ function init(game: Phaser.Game, g: Game) {
 
   root.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
-    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act],[data-tab]');
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act],[data-tab],[data-sub]');
     if (!el || el.matches(':disabled')) return;
     save(); // le clic précède le `change` du champ en cours de saisie
-    if (el.dataset.tab) {
+    if (el.dataset.sub) {
+      sub = el.dataset.sub as Sub;
+      showSub();
+    } else if (el.dataset.tab) {
       tab = el.dataset.tab as Tab;
       render();
     } else act(el);
@@ -362,6 +390,7 @@ function init(game: Phaser.Game, g: Game) {
   // premier lancement : aucune chaîne ni en réglages ni en URL → le menu guide la saisie (le jeu tourne déjà)
   if (!params.channel) {
     tab = 'settings';
+    sub = 'channel';
     notice = NO_CHANNEL;
     setOpen(true);
   }
