@@ -253,5 +253,31 @@ await page.waitForTimeout(1000);
 check('changement de thème pendant une pluie d\'or', goldOn && !(await page.evaluate(`${S}.gold`)),
   `${themeBefore} → ${await page.evaluate(`${G}.theme.id`)}`);
 
+await page.close();
+
+// 7. Attente animée : bacs qui défilent, figés en pause ; valeur d'URL hors de la liste du menu conservée
+page = await open('?debug=1&binScroll=1');
+const binPts = () => page.evaluate(`${G}.bins.points.join()`);
+const binsBefore = await binPts();
+await page.waitForFunction(`${G}.bins.points.join() !== '${binsBefore}'`, null, { timeout: 5000 }).catch(() => {});
+const binsAfter = (await binPts()).split(',');
+check('bacs : valeurs décalées, jackpot jamais au bord', binsAfter.join() !== binsBefore && binsAfter[0] !== '500' && binsAfter.at(-1) !== '500',
+  `${binsBefore} → ${binsAfter.join()}`);
+await page.evaluate(`${G}.admin('pause')`);
+const still = () => page.evaluate(`JSON.stringify([${G}.bins.points, ${G}.movers.map((m) => [m.body.position.x, m.body.position.y])])`);
+const pausedAt = await still();
+await page.waitForTimeout(2500);
+check('pause : bacs et mobiles figés', (await still()) === pausedAt);
+await page.evaluate(`${G}.admin('resume')`);
+await page.close();
+
+page = await open('?debug=1&binScroll=45');
+await page.keyboard.press('Escape');
+await page.click('[data-tab=settings]');
+const listed = await page.inputValue('select[name=binScroll]');
+await page.keyboard.press('Escape');
+check('binScroll=45 : affiché dans la liste, jamais enregistré', listed === '45' && (await saved()).binScroll !== 45, `liste ${listed}`);
+await page.close();
+
 check('aucune erreur JS', errors.length === 0, errors.join(' | '));
 await browser.close();

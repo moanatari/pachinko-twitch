@@ -262,6 +262,12 @@ function makeBins(rng: Rng, b: Bounds, symmetric: boolean): Bin[] {
   return pts.map((points, i) => ({ x: b.left + i * width, width, points }));
 }
 
+/** Décalages k de la bande des valeurs (valeur i → bac (i + k) % n) qui gardent le jackpot loin des bords. Contient 0. */
+export function binShifts(points: readonly number[]): number[] {
+  const n = points.length, j = points.indexOf(Math.max(...points));
+  return Array.from({ length: n }, (_, k) => k).filter((k) => (j + k) % n !== 0 && (j + k) % n !== n - 1);
+}
+
 /** Couloir du bas : un élément en aller-retour de mur à mur juste au-dessus de la bande des bacs (deux en
  *  miroir en symétrique, un par moitié). La zone de jeu remonte au-dessus de lui. */
 function lane(g: Builder, symmetric: boolean) {

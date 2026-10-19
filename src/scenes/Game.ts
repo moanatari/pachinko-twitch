@@ -23,6 +23,7 @@ import type { AdminAction } from '../twitch/chat';
 import { Juice, type Pulse } from './fx';
 import { ROWS } from './Hud';
 import { Specials } from './specials';
+import { Bins, type BinFace } from './bins';
 
 type Body = MatterJS.BodyType;
 export type ModAction = 'removeBall' | 'resetScore' | 'ban' | 'unban';
@@ -81,6 +82,7 @@ export class Game extends Phaser.Scene {
   readonly pegs: PegRt[] = [];
   readonly fx = new Juice(this);
   private specials = new Specials(this);
+  readonly bins = new Bins(this);
   private frame = 0; // traînées : une frame sur deux
   private queued = new Map<string, () => void>(); // commandes reçues pendant un chargement, rejouées ensuite
 
@@ -344,30 +346,37 @@ export class Game extends Phaser.Scene {
       this.mover(body, s, [img]);
     }
 
-    const g = this.track(this.add.graphics());
     const binH = HEIGHT - map.binTop;
-    map.bins.forEach((bin, i) => {
-      g.fillStyle(hex(pal.bins[i % pal.bins.length]), 1).fillRect(bin.x, map.binTop, bin.width, binH);
+    // faces d'abord (fond, liseré, chiffre) : elles glissent sous les flashs et les séparateurs
+    const faces: BinFace[] = map.bins.map((bin, i) => {
+      const face = this.track(this.add.container(bin.x, map.binTop));
+      face.add(this.add.rectangle(0, 0, bin.width, binH, hex(pal.bins[i % pal.bins.length])).setOrigin(0));
+      if (bin.points >= BIG_WIN) {
+        // gros bacs : liseré rouge laqué + or
+        face.add(this.add.graphics()
+          .lineStyle(4, hex(pal.bumperCore), 1).strokeRect(5, 5, bin.width - 10, binH - 10)
+          .lineStyle(1, hex(pal.accent), 1).strokeRect(9, 9, bin.width - 18, binH - 18));
+      }
+      face.add(this.add.text(bin.width / 2, binH * 0.55, String(bin.points), {
+        fontFamily: this.theme.font.family, fontSize: '30px', color: pal.binHighlight,
+      }).setOrigin(0.5));
+      return { obj: face, points: bin.points };
+    });
+    const slots: El[] = map.bins.map((bin, i) => {
       const sensor = this.staticBody(this.matter.add.rectangle(
         bin.x + bin.width / 2, map.binTop + binH / 2 + BALL_R * 2, bin.width - DIVIDER, binH,
         { isStatic: true, isSensor: true, label: 'bin' }));
       const rect = this.track(this.add.rectangle(bin.x, map.binTop, bin.width, binH, hex(pal.binHighlight))
         .setOrigin(0).setBlendMode('ADD').setAlpha(0));
-      this.els.set(sensor.id, { kind: 'bin', points: bin.points, binX: bin.x + bin.width / 2, pulse: { kind: 'bin', v: 0, rect } });
-      if (bin.points >= BIG_WIN) {
-        // gros bacs : liseré rouge laqué + or
-        g.lineStyle(4, hex(pal.bumperCore), 1).strokeRect(bin.x + 5, map.binTop + 5, bin.width - 10, binH - 10);
-        g.lineStyle(1, hex(pal.accent), 1).strokeRect(bin.x + 9, map.binTop + 9, bin.width - 18, binH - 18);
-      }
-      this.track(this.add.text(bin.x + bin.width / 2, map.binTop + binH * 0.55, String(bin.points), {
-        fontFamily: this.theme.font.family, fontSize: '30px', color: pal.binHighlight,
-      }).setOrigin(0.5));
-      if (i > 0) {
-        this.staticBody(this.matter.add.rectangle(bin.x, map.binTop + binH / 2, DIVIDER, binH, { isStatic: true, label: 'wall' }));
-        g.fillStyle(hex(pal.frame), 1).fillRect(bin.x - DIVIDER / 2, map.binTop, DIVIDER, binH);
-      }
+      const el: El = { kind: 'bin', points: bin.points, binX: bin.x + bin.width / 2, pulse: { kind: 'bin', v: 0, rect } };
+      this.els.set(sensor.id, el);
+      if (i > 0) this.staticBody(this.matter.add.rectangle(bin.x, map.binTop + binH / 2, DIVIDER, binH, { isStatic: true, label: 'wall' }));
+      return el;
     });
+    const g = this.track(this.add.graphics());
+    for (const bin of map.bins.slice(1)) g.fillStyle(hex(pal.frame), 1).fillRect(bin.x - DIVIDER / 2, map.binTop, DIVIDER, binH);
     g.fillStyle(hex(pal.frame), 1).fillRect(WALL, map.binTop - 2, BOARD_W - WALL * 2, 3);
+    this.bins.attach(faces, slots, map.bins[0].x, map.bins[0].width);
 
     // taquet spécial : pastille + halo créés une fois par carte, déplacés et teintés à chaque apparition
     this.specials.attach(
@@ -590,6 +599,7 @@ export class Game extends Phaser.Scene {
     }
     this.fx.update(delta);
     this.specials.update(delta);
+    this.bins.update(delta);
     for (const ball of this.toRemove) this.removeBall(ball);
     this.toRemove.length = 0;
   }

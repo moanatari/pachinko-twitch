@@ -92,5 +92,6 @@ export const QUAKE_KICK = 9; // px / step vers le haut
 
 // --- Partie ---
 export const PODIUM_MS = 15000;
+export const BIN_SCROLL_MS = 800; // glissement de la bande des bacs
 
 export const params = parseParams(typeof location === 'undefined' ? '' : location.search, loadSettings(safeStorage()));
