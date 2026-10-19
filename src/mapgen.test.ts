@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateMap, validateMap, BOARD_BOUNDS, PATTERNS, type MapData } from './mapgen';
-import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK } from './config';
+import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK, PEG_SHARE, RARE_PEG_SPACING } from './config';
 
 const b = BOARD_BOUNDS;
 const binTop = b.bottom - BIN_H;
@@ -22,33 +22,33 @@ describe('validateMap', () => {
 
   it('détecte deux taquets trop proches', () => {
     const m = empty();
-    m.pegs.push({ x: 400, y: midY, golden: false }, { x: 420, y: midY, golden: false });
+    m.pegs.push({ x: 400, y: midY, value: 1 }, { x: 420, y: midY, value: 1 });
     expect(validateMap(m).join()).toMatch(/écart/);
   });
 
   it('détecte un taquet trop proche d\'un tourniquet (rayon de balayage)', () => {
     const m = empty();
     m.spinners.push({ x: 400, y: midY, radius: 46, speed: 0.03 });
-    m.pegs.push({ x: 400 + 46 + 10, y: midY, golden: false });
+    m.pegs.push({ x: 400 + 46 + 10, y: midY, value: 1 });
     expect(validateMap(m).join()).toMatch(/écart/);
   });
 
   it('détecte un taquet trop proche d\'une rampe (distance point–segment)', () => {
     const m = empty();
     m.ramps.push({ x: 500, y: midY, length: 300, angle: 0.4 });
-    m.pegs.push({ x: 500, y: midY + 20, golden: false });
+    m.pegs.push({ x: 500, y: midY + 20, value: 1 });
     expect(validateMap(m).join()).toMatch(/écart/);
   });
 
   it('détecte un élément trop près d\'un mur', () => {
     const m = empty();
-    m.pegs.push({ x: b.left + 12, y: midY, golden: false });
+    m.pegs.push({ x: b.left + 12, y: midY, value: 1 });
     expect(validateMap(m).join()).toMatch(/mur/);
   });
 
   it('détecte un élément dans la zone de spawn', () => {
     const m = empty();
-    m.pegs.push({ x: 600, y: b.top + SPAWN_ZONE / 2, golden: false });
+    m.pegs.push({ x: 600, y: b.top + SPAWN_ZONE / 2, value: 1 });
     expect(validateMap(m).join()).toMatch(/spawn/);
   });
 
@@ -139,7 +139,8 @@ describe('generateMap', () => {
     const mx = (x: number) => b.left + b.right - x;
     for (let seed = 0; seed < 50; seed++) {
       const m = generateMap(seed, 'symetrique');
-      for (const p of m.pegs) expect(m.pegs.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y)), `seed ${seed} taquet`).toBe(true);
+      for (const p of m.pegs)
+        expect(m.pegs.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y) && q.value === p.value), `seed ${seed} taquet`).toBe(true);
       for (const p of m.bumpers) expect(m.bumpers.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y))).toBe(true);
       for (const p of m.spinners)
         expect(m.spinners.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y) && (near(q.x, p.x) || near(q.speed, -p.speed)))).toBe(true);
@@ -179,4 +180,40 @@ describe('generateMap', () => {
       }
     });
   }
+});
+
+describe('taquets à valeur', () => {
+  const count = (m: MapData, v: number) => m.pegs.filter((p) => p.value === v).length;
+
+  it('exactement un taquet à 50, paliers 5 / 10 / 30 en nombres fixes', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 100; seed++) {
+        const m = generateMap(seed, pattern), n = m.pegs.length, at = `${pattern} ${seed}`;
+        expect(count(m, 50), at).toBe(1);
+        expect(count(m, 30), at).toBeGreaterThanOrEqual(1);
+        expect(count(m, 30), at).toBeLessThanOrEqual(Math.max(1, Math.round(n * PEG_SHARE[30])) + 1);
+        for (const v of [5, 10] as const)
+          expect(Math.abs(count(m, v) - Math.round(n * PEG_SHARE[v])), `${at} palier ${v}`).toBeLessThanOrEqual(1);
+        expect(count(m, 1), at).toBeGreaterThan(count(m, 5));
+      }
+    }
+  });
+
+  it('taquets à 30 et 50 espacés d\x27au moins RARE_PEG_SPACING', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 100; seed++) {
+        const rare = generateMap(seed, pattern).pegs.filter((p) => p.value >= 30);
+        for (const p of rare)
+          for (const q of rare)
+            if (p !== q) expect(Math.hypot(p.x - q.x, p.y - q.y), `${pattern} ${seed}`).toBeGreaterThanOrEqual(RARE_PEG_SPACING);
+      }
+    }
+  });
+
+  it('symétrique : le 50 est sur l\x27axe central', () => {
+    for (let seed = 0; seed < 100; seed++) {
+      const fifty = generateMap(seed, 'symetrique').pegs.find((p) => p.value === 50)!;
+      expect(Math.abs(fifty.x - (b.left + b.right) / 2), `seed ${seed}`).toBeLessThan(0.5);
+    }
+  });
 });
