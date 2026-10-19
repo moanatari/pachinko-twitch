@@ -4,7 +4,7 @@ import type { Theme, SpriteSource, DrawFn } from './types';
 import * as D from './draw';
 import type { PegValue } from '../mapgen';
 import { KANJI_FONT } from './base';
-import { PEG_R, BUMPER_R, SPINNER_R, BALL_R, RAMP_THICK, BOARD_W, HEIGHT } from '../config';
+import { PEG_R, BUMPER_R, SPINNER_R, BALL_R, RAMP_THICK, BAR_THICK, SPINNER_R_LONG, BOARD_W, HEIGHT } from '../config';
 
 export const TEX_SCALE = 2; // textures dessinées à 2× puis réduites (net en 1080p)
 
@@ -16,6 +16,8 @@ const SIZES: Record<string, [number, number]> = {
   pegSpecial: square(PEG_R),
   bumper: square(BUMPER_R),
   spinner: square(SPINNER_R),
+  spinnerLong: square(SPINNER_R_LONG),
+  bar: [256, BAR_THICK * TEX_SCALE], // étirée à la longueur de chaque barre
   ramp: [256, RAMP_THICK * TEX_SCALE], // étirée à la longueur de chaque rampe
   background: [BOARD_W, HEIGHT],
   ball: square(BALL_R),
@@ -35,6 +37,7 @@ const DEFAULTS: Record<string, DrawFn> = {
   pegSpecial: D.drawPegSpecial,
   bumper: D.drawBumper,
   spinner: D.drawSpinner,
+  spinnerLong: D.drawSpinnerLong, bar: D.drawBar,
   ramp: D.drawRamp,
   background: D.drawBackground,
   ball: D.drawBall,
@@ -62,7 +65,8 @@ export async function applyTheme(scene: Phaser.Scene, theme: Theme): Promise<voi
   const images: [string, string][] = [];
   for (const [key, [w, h]] of Object.entries(SIZES)) {
     if (scene.textures.exists(key)) scene.textures.remove(key);
-    const src = sources[key] ?? DEFAULTS[key];
+    // hélice longue : reprend l'hélice du thème s'il en dessine une (étoile de mer de Plage)
+    const src = sources[key] ?? (key === 'spinnerLong' ? sources.spinner : null) ?? DEFAULTS[key];
     if (typeof src === 'string') {
       images.push([key, src]);
       continue;
