@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { generateMap, validateMap, BOARD_BOUNDS, PATTERNS, type MapData } from './mapgen';
-import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK, SPINNER_R_LONG, PEG_SHARE, RARE_PEG_SPACING } from './config';
+import { generateMap, validateMap, BOARD_BOUNDS, PATTERNS, type MapData, type Move } from './mapgen';
+import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK, SPINNER_R_LONG, PEG_SHARE, RARE_PEG_SPACING, MOVERS_MIN, MOVERS_MAX, MOVE_LEN_MIN, MOVE_LEN_MAX } from './config';
 
 const b = BOARD_BOUNDS;
 const binTop = b.bottom - BIN_H;
@@ -81,6 +81,19 @@ describe('validateMap', () => {
     expect(validateMap(m).join()).toMatch(/plate/);
   });
 
+  it('détecte un taquet sur le trajet d\'un bumper mobile (capsule balayée)', () => {
+    const m = empty();
+    m.bumpers.push({ x: 400, y: midY, radius: 26, move: { x2: 700, y2: midY, periodMs: 5000, phase: 0 } });
+    m.pegs.push({ x: 550, y: midY + 40, value: 1 });
+    expect(validateMap(m).join()).toMatch(/écart/);
+  });
+
+  it('détecte une barre mobile qui ne glisse pas dans son axe', () => {
+    const m = empty();
+    m.bars.push({ x: 400, y: midY, length: 120, angle: 0, move: { x2: 400, y2: midY + 150, periodMs: 5000, phase: 0 } });
+    expect(validateMap(m).join()).toMatch(/axe/);
+  });
+
   it('détecte moins de 5 bacs ou des bacs qui ne couvrent pas la largeur', () => {
     const m = empty();
     m.bins = bins.slice(0, 4);
@@ -137,6 +150,23 @@ describe('generateMap', () => {
     }
   });
 
+  const moving = (m: MapData) => [...m.bumpers, ...m.bars, ...m.spinners].filter((e) => e.move);
+
+  it('2 à 4 éléments mobiles par carte, trajets et périodes bornés', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 100; seed++) {
+        const movers = moving(generateMap(seed, pattern)), at = `${pattern} ${seed}`;
+        expect(movers.length, at).toBeGreaterThanOrEqual(MOVERS_MIN);
+        expect(movers.length, at).toBeLessThanOrEqual(MOVERS_MAX);
+        for (const e of movers) {
+          const len = Math.hypot(e.move!.x2 - e.x, e.move!.y2 - e.y);
+          expect(len, at).toBeGreaterThanOrEqual(MOVE_LEN_MIN - 0.5);
+          expect(len, at).toBeLessThanOrEqual(MOVE_LEN_MAX + 0.5);
+        }
+      }
+    }
+  });
+
   it('5 patterns disponibles', () =>
     expect([...PATTERNS].sort()).toEqual(['classique', 'diagonale', 'entonnoirs', 'symetrique', 'trous']));
 
@@ -148,15 +178,18 @@ describe('generateMap', () => {
   it('symétrique : chaque élément a son miroir', () => {
     const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
     const mx = (x: number) => b.left + b.right - x;
+    const sameMove = (p: { move?: Move }, q: { move?: Move }) => !p.move ? !q.move
+      : !!q.move && near(q.move.x2, mx(p.move.x2)) && near(q.move.y2, p.move.y2)
+        && q.move.phase === p.move.phase && q.move.periodMs === p.move.periodMs;
     for (let seed = 0; seed < 50; seed++) {
       const m = generateMap(seed, 'symetrique');
       for (const p of m.pegs)
         expect(m.pegs.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y) && q.value === p.value), `seed ${seed} taquet`).toBe(true);
-      for (const p of m.bumpers) expect(m.bumpers.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y))).toBe(true);
+      for (const p of m.bumpers) expect(m.bumpers.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y) && sameMove(p, q))).toBe(true);
       for (const p of m.spinners)
-        expect(m.spinners.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y) && (near(q.x, p.x) || near(q.speed, -p.speed)))).toBe(true);
+        expect(m.spinners.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y) && (near(q.x, p.x) || near(q.speed, -p.speed)) && sameMove(p, q))).toBe(true);
       for (const r of m.ramps) expect(m.ramps.some((q) => near(q.x, mx(r.x)) && near(q.y, r.y) && near(q.angle, -r.angle))).toBe(true);
-      for (const r of m.bars) expect(m.bars.some((q) => near(q.x, mx(r.x)) && near(q.y, r.y) && near(q.angle, -r.angle))).toBe(true);
+      for (const r of m.bars) expect(m.bars.some((q) => near(q.x, mx(r.x)) && near(q.y, r.y) && near(q.angle, -r.angle) && sameMove(r, q))).toBe(true);
     }
   });
 
