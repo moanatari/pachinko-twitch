@@ -54,6 +54,12 @@ terminée et vérifiée.
 - [x] 16. Fin de partie nette + lien copiable des réglages
 - [x] 17. Réglages enregistrés automatiquement, croix de fermeture, lien OBS sans menu (`menu=0`)
 - [x] 18. Chaîne connectée par un bouton, état de la connexion affiché
+- [ ] 19. Taquets à valeur (1, 5, 10, 30, 50) (spec `docs/superpowers/specs/2026-10-19-mobiles-couloir-bacs-taquets-design.md`, plan `docs/superpowers/plans/2026-10-19-mobiles-couloir-bacs-taquets.md`)
+- [ ] 20. Barres bumpers et hélices longues (même spec, même plan)
+- [ ] 21. Éléments mobiles (même spec, même plan)
+- [ ] 22. Couloir du bas (même spec, même plan)
+- [ ] 23. Bacs qui défilent (même spec, même plan)
+- [ ] 24. Billes d'animation pendant l'attente (même spec, même plan)
 
 ## Décisions prises
 | Sujet | Choix |
@@ -684,6 +690,38 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
       nom invalide signalé au même endroit, « Connecté à #… » une fois le `room-id` reçu (`Game.connected`).
 - ⚠️ L'état ne retombe pas si la socket se coupe en cours de stream (reconnexion automatique, non affichée).
 - [x] **Vérif** : `npm run test` et `npm run verify` verts.
+
+### 19. Taquets à valeur
+- [ ] `Peg.value` (1, 5, 10, 30, 50) en nombres fixes par carte, un seul 50, 30 et 50 espacés, miroir en symétrique.
+- [ ] Textures `peg5`, `peg30`, `peg50` (le 10 garde `pegGolden`), halos, étincelles selon la valeur.
+- [ ] Taquets spéciaux sur les taquets à 1 point ; pluie d'or : au moins 10 points, chaque taquet retrouve sa texture.
+- ⚠️ La carte d'une seed change (tirages modifiés) : l'historique rejoue une carte différente pour les anciennes parties.
+- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps à `?debug=1&bots=150` ; chaque thème (touche T).
+
+### 20. Barres bumpers et hélices longues
+- [ ] `Bar` (capsule, rebond perpendiculaire), une fois sur trois à la place d'un bumper dans les motifs.
+- [ ] Hélices longues (≈ 1 sur 3, plus lentes), texture `spinnerLong` (reprend l'hélice du thème s'il en dessine une).
+- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps.
+
+### 21. Éléments mobiles
+- [ ] `move` sur bumpers, barres, hélices ; capsule balayée dans les règles ; 2 à 4 mobiles posés avant les taquets.
+- [ ] Corps déplacés à chaque sous-pas (`setPosition(…, true)`), figés en pause.
+- ⚠️ Une barre mobile glisse dans son axe (sinon la zone balayée n'est plus une capsule).
+- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps ; aucune bille coincée par un mobile.
+
+### 22. Couloir du bas
+- [ ] Réglage `lane` (menu + URL `lane=0`, carte suivante).
+- [ ] Un élément de mur à mur au-dessus des bacs, deux en miroir en symétrique ; passage ≥ `MIN_GAP` aux bouts.
+- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps.
+
+### 23. Bacs qui défilent
+- [ ] Réglage `binScroll` (désactivé / 30 s / 1 min, URL 0–300) ; `binShifts` (jackpot jamais au bord).
+- [ ] `src/scenes/bins.ts` : glissement animé, valeurs payées tout de suite, figé en pause et au podium.
+- [ ] **Vérif** : `npm run test` et `npm run verify` verts (défilement, pause, `binScroll=45` conservé).
+
+### 24. Billes d'animation
+- [ ] Réglage `attract` ; `src/scenes/attract.ts` : billes hors `GameState` pendant l'attente, figées puis éclatées à la première vraie bille.
+- [ ] **Vérif** : `npm run test` et `npm run verify` verts (classement vide, plafond, changement de thème) ; 60 fps.
 
 ## Vérification
 - `npm run test` : `mapgen.test.ts` (1000 seeds × 5 patterns respectent les règles),

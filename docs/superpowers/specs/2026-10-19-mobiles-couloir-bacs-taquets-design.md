@@ -49,41 +49,45 @@ type PegValue = 1 | 5 | 10 | 30 | 50;
 interface Bumper  { x: number; y: number; radius: number; move?: Move }
 interface Spinner { x: number; y: number; radius: number; speed: number; move?: Move } // radius court ou long
 interface Bar     { x: number; y: number; length: number; angle: number; move?: Move } // barre bumper, centre + angle
-type LaneEl = ({ kind: 'bumper' } & Bumper) | ({ kind: 'bar' } & Bar) | ({ kind: 'spinner' } & Spinner);
-interface MapData { /* existant */ bars: Bar[]; lane: LaneEl[] }
+interface MapData { /* existant */ bars: Bar[]; laneTop?: number } // laneTop absent = pas de couloir
 generateMap(seed, pattern?, bounds?, opts?: { lane?: boolean }) // lane = true par défaut
 ```
 
 - `phase` ∈ [0, 1) : position de départ dans le cycle. Les paires miroir partagent la même phase.
-- Les éléments du couloir ont tous un `move`.
+- Les éléments du couloir sont rangés avec les autres (`bumpers`, `bars`, `spinners`), tous mobiles,
+  et sont ceux dont `y > laneTop` : `Game` les construit sans code particulier.
 
 ### Géométrie
 - Barre : capsule de longueur `length`, rayon `BAR_THICK / 2`.
 - Élément mobile : la forme vérifiée est la **capsule balayée** de (x, y) à (x2, y2), de rayon égal au
   rayon de l'élément (le rayon de balayage pour une hélice, la demi-longueur plus la demi-épaisseur pour
   une barre). Toutes les règles existantes (écart `MIN_GAP`, murs, spawn, bande des bacs) s'appliquent
-  à cette capsule sans cas particulier. Une barre mobile ne tourne pas.
+  à cette capsule sans cas particulier. Une barre mobile ne tourne pas et glisse dans son propre axe :
+  sa zone balayée reste un segment (`validateMap` refuse une barre mobile hors de son axe).
 - `validateMap` inclut barres, mobiles (capsules balayées) et éléments du couloir.
 
 ### Ordre de génération
 1. **Bacs** : inchangé.
-2. **Couloir** (si `opts.lane`) : bande de hauteur `LANE_H` juste au-dessus de la bande `BIN_CLEAR`. La
-   zone de jeu (`playBottom`) remonte de `LANE_H` ; aucun autre élément n'y est posé. Contenu tiré parmi
+2. **Couloir** (si `opts.lane`) : élément posé juste au-dessus de la bande `BIN_CLEAR` ; la bande a la
+   hauteur de l'élément (`laneTop` = son haut) et la zone de jeu (`playBottom`) remonte à `laneTop − MIN_GAP` ;
+   aucun autre élément n'y est posé. Contenu tiré parmi
    bumper rond, barre horizontale (`LANE_BAR_LEN`) et hélice (normale ou longue) :
    - carte non symétrique : un élément, trajet d'un mur à l'autre en gardant `MIN_GAP` aux murs ;
    - carte symétrique : deux éléments identiques en miroir, chacun sur sa moitié, qui gardent `MIN_GAP`
      entre eux au centre et aux murs.
    - Période d'un aller-retour : `LANE_PERIOD_MS` (plus lente que les mobiles du plateau).
 3. **Déflecteurs muraux** : inchangé.
-4. **Mobiles** : `MOVERS_MIN`..`MOVERS_MAX` (2 à 4) bumpers, barres ou hélices, posés **avant** le motif.
-   Trajet de `MOVE_LEN_MIN`..`MOVE_LEN_MAX` (150 à 350 px), angle tiré surtout près de l'horizontale.
-   Période de `MOVE_PERIOD_MIN`..`MOVE_PERIOD_MAX` (4 à 8 s l'aller-retour). En symétrique, des paires
-   miroir (une ou deux), mouvement miroir ; un mobile sur l'axe garde un trajet vertical.
-5. **Motif** : les cinq générateurs actuels, inchangés dans leur logique. Là où ils posent un bumper, ils
+4. **Motif** : les cinq générateurs actuels, inchangés dans leur logique. Leurs taquets sont mis en
+   attente (posés à l'étape 6) ; leur structure (rampes, bumpers, hélices) est posée tout de suite. Là où ils posent un bumper, ils
    peuvent poser une barre (≈ 1 fois sur 3, angle libre, `BAR_LEN_MIN`..`BAR_LEN_MAX` = 90 à 160 px).
    Toute hélice est longue (`SPINNER_R_LONG` ≈ 75) avec une probabilité ≈ 1/3, et tourne alors à
    `SPINNER_LONG_SPEED` fois la vitesse (plus lente).
-6. **Valeurs des taquets** : tirées après la pose de tous les taquets, en nombres fixes proportionnels
+5. **Mobiles** : `MOVERS_MIN`..`MOVERS_MAX` (2 à 4) bumpers, barres ou hélices, posés après la structure
+   du motif et **avant ses taquets** (le motif garde ses rampes et entonnoirs, les taquets évitent les trajets).
+   Trajet de `MOVE_LEN_MIN`..`MOVE_LEN_MAX` (150 à 350 px), angle tiré surtout près de l'horizontale.
+   Période de `MOVE_PERIOD_MIN`..`MOVE_PERIOD_MAX` (4 à 8 s l'aller-retour). En symétrique, une ou deux
+   paires miroir, hors de l'axe, mouvement miroir.
+6. **Taquets du motif**, puis **valeurs des taquets** : tirées après la pose de tous les taquets, en nombres fixes proportionnels
    au nombre `n` de taquets : 5 pts ≈ 7 %, 10 pts ≈ 3 %, 30 pts ≈ 1 % (au moins 1), 50 pts **exactement 1**.
    Les taquets à 30 et 50 sont espacés d'au moins `RARE_PEG_SPACING`. En symétrique, les valeurs sont en
    miroir (comptes des paliers 5, 10 et 30 arrondis à la paire) et le 50 est posé sur un taquet de l'axe
@@ -161,8 +165,9 @@ longueur) : clé fixe `spinnerLong` ajoutée au thème de base, hitbox inchangé
 ## 4. Configuration (`src/config.ts`)
 Toutes les nouvelles valeurs y sont centralisées : `PEG_VALUES` et leurs proportions, `RARE_PEG_SPACING`,
 `BAR_THICK`, `BAR_LEN_MIN/MAX`, `SPINNER_R_LONG`, `SPINNER_LONG_SPEED`, `MOVERS_MIN/MAX`,
-`MOVE_LEN_MIN/MAX`, `MOVE_PERIOD_MIN/MAX`, `LANE_H`, `LANE_BAR_LEN`, `LANE_PERIOD_MS`, `BIN_SCROLL_MS`,
-`ATTRACT_EVERY_MS`, `ATTRACT_MAX`, `ATTRACT_POP_MS`. `PTS_PEG_GOLDEN` disparaît au profit des valeurs.
+`MOVE_LEN_MIN/MAX`, `MOVE_PERIOD_MIN/MAX`, `LANE_BAR_LEN`, `LANE_PERIOD_MS`, `BIN_SCROLL_MS`,
+`ATTRACT_EVERY_MS`, `ATTRACT_MAX`, `ATTRACT_POP_MS`, `ATTRACT_ALPHA`. `PTS_PEG` disparaît au profit des
+valeurs ; `PTS_PEG_GOLDEN` reste la valeur minimale d'un taquet pendant la pluie d'or.
 
 ## 5. Tests et vérification
 - `mapgen.test.ts`, sur une centaine de seeds et pour chaque motif, avec et sans couloir :
