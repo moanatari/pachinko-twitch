@@ -26,6 +26,7 @@ const entry = (id, score) => `{ id: '${id}', name: '${id}', color: '#ff0000', sc
 const inMonthly = (page, id) => page.evaluate(`${G}.monthly.top(500, Date.now()).some((e) => e.id === '${id}')`);
 const S = `${G}.specials`;
 const gravityY = (page) => page.evaluate(`${G}.matter.world.localWorld.gravity.y`);
+const sub = (id) => page.click(`[data-sub=${id}]`); // sous-onglet des réglages
 
 // 1. Premier lancement → menu ouvert sur Réglages
 let page = await open('?debug=1');
@@ -51,9 +52,11 @@ check('streamer provisoire : retiré du top du mois', !(await inMonthly(page, 's
 // 2. Chaîne : connectée seulement sur validation (bouton Connecter ou Entrée), puis persistée après rechargement
 const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('pachinko-settings')));
 await page.fill('input[name=channel]', 'Pachinko_Test');
+await sub('play');
 await page.focus('input[name=duration]'); // quitter le champ ne valide pas
 const waitConn = (test) => page.waitForFunction(`document.querySelector('.menu-conn').textContent${test}`, null, { timeout: 5000 }).then(() => true, () => false);
 check('chaîne : pas connectée en quittant le champ, saisie en attente signalée', !(await saved())?.channel && await waitConn(`.startsWith('Chaîne modifiée')`));
+await sub('channel');
 await page.fill('input[name=channel]', 'zz'); // login trop court pour exister : Twitch ne répondra jamais
 await page.press('input[name=channel]', 'Enter');
 check('chaîne : connectée sur Entrée, menu resté ouvert', (await saved())?.channel === 'zz' && await page.isVisible('.menu-backdrop'));
@@ -66,13 +69,17 @@ check('chaîne : connectée au bouton, nom normalisé', (await saved()).channel 
 await page.evaluate(`${G}.setStreamer('999', 'pachinko_test')`); // room-id reçu du tchat
 check('chaîne : connectée une fois le room-id reçu', await waitConn(` === 'Connecté à #pachinko_test'`));
 check('enregistrement auto : plus de bouton Enregistrer', (await page.locator('[data-act=save]').count()) === 0);
+await sub('fx');
 await page.uncheck('input[name=shake]');
 check('enregistrement auto : case à cocher au clic', (await saved()).shake === false);
 await page.check('input[name=shake]');
+await sub('play');
 await page.fill('input[name=duration]', '999');
 await page.press('input[name=duration]', 'Enter');
 check('enregistrement auto : valeur bornée remise dans le champ', (await page.inputValue('input[name=duration]')) === '60');
+await sub('channel');
 await page.fill('input[name=channel]', 'bad name');
+await sub('play');
 await page.fill('input[name=duration]', '7');
 await page.keyboard.press('Escape'); // fermer enregistre la saisie en cours
 check('enregistrement auto : à la fermeture, chaîne non validée ignorée', (await saved()).duration === 7 && (await saved()).channel === 'pachinko_test');
@@ -82,6 +89,7 @@ await page.click('[data-tab=game]'); // changer d'onglet aussi
 check('enregistrement auto : au changement d\'onglet', (await saved()).duration === 5);
 await page.click('[data-tab=settings]');
 // 2 a. Lien copiable : adresse de la page + tous les réglages enregistrés + menu=0, sans les paramètres de dev
+await sub('channel');
 const link = await page.inputValue('input[name=link]');
 check('lien : adresse de la page, chaîne et réglages', link.startsWith(`${URL}?channel=pachinko_test&`)
   && ['duration=5', 'maxBalls=150', 'theme=auto', 'shake=1', 'autoNext=1', 'specialEvery=20', 'specialEffects='].every((p) => link.includes(p))
@@ -93,6 +101,7 @@ await page.fill('input[name=channel]', 'autre');
 await page.click('[data-act=copy-link]');
 await page.waitForFunction(`document.querySelector('.menu-notice').textContent.includes('pas validée')`);
 check('lien : chaîne saisie non validée signalée, absente du lien', (await page.evaluate(() => navigator.clipboard.readText())) === link);
+await sub('play');
 await page.fill('input[name=duration]', '6'); // saisie en cours : ni Entrée ni sortie du champ
 await page.reload();
 await page.waitForFunction(`!!${G}?.map`);
@@ -107,6 +116,7 @@ check('attente : timer figé avant la première bille', (await page.evaluate(`${
 const seedWaiting = await page.evaluate(`${G}.map.seed`);
 await page.keyboard.press('Escape');
 await page.click('[data-tab=settings]');
+await sub('play');
 await page.click('[data-act=apply-now]');
 check('nouvelle partie : sans confirmation avant la première bille',
   await page.waitForFunction(`${G}.map && ${G}.map.seed !== ${seedWaiting}`, null, { timeout: 5000 }).then(() => true, () => false));
@@ -150,6 +160,7 @@ check('exclu : drop refusé', !(await page.evaluate(`${G}.requestDrop(${viewer('
 check('exclu : ban persisté', await page.evaluate(() => localStorage.getItem('pachinko-bans').includes('"v1"')));
 check('exclu : retiré du top du mois', !(await inMonthly(page, 'v1')));
 await page.click('[data-tab=settings]');
+await sub('bans');
 await page.click('[data-act=unban][data-id=v1]');
 check('réintégré : drop accepté', await page.evaluate(`${G}.requestDrop(${viewer('v1')}, 400)`));
 
@@ -167,6 +178,7 @@ check('ralenti : les billes des autres seulement',
   await page.evaluate(`[...${G}.balls.values()].every((b) => b.body.timeScale === (b.userId === 'v3' ? 1 : 0.4))`));
 
 // 5. Historique alimenté après une partie de 1 min
+await sub('play');
 await page.fill('input[name=duration]', '1');
 const seedBefore = await page.evaluate(`${G}.map.seed`);
 await page.click('[data-act=apply-now]'); // arme
@@ -274,6 +286,7 @@ await page.close();
 page = await open('?debug=1&binScroll=45');
 await page.keyboard.press('Escape');
 await page.click('[data-tab=settings]');
+await sub('play');
 const listed = await page.inputValue('select[name=binScroll]');
 await page.keyboard.press('Escape');
 check('binScroll=45 : affiché dans la liste, jamais enregistré', listed === '45' && (await saved()).binScroll !== 45, `liste ${listed}`);
@@ -299,6 +312,15 @@ await page.evaluate(`${G}.nextTheme()`);
 await page.waitForFunction(`${G}.theme.id !== '${themeFrom}' && !!${G}.map`);
 await page.waitForTimeout(1500);
 check('changement de thème pendant un défilement et des billes d\'animation', errors.length === 0, errors.join(' | '));
+await page.close();
+
+// 9. À propos : version calculée au build, outils et dépôt
+page = await open('?debug=1');
+await page.keyboard.press('Escape');
+await page.click('[data-tab=about]');
+const about = await page.textContent('.menu-body');
+check('à propos : version, Phaser et lien GitHub', /v0.1.[0-9]+/.test(about) && about.includes('Phaser 3.90')
+  && (await page.getAttribute('.menu-body a', 'href')) === 'https://github.com/moanatari/pachinko-twitch', about.trim().slice(0, 80));
 await page.close();
 
 check('aucune erreur JS', errors.length === 0, errors.join(' | '));
