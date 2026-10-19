@@ -47,8 +47,10 @@ export const BIN_CLEAR = 70; // bande libre au-dessus des bacs
 export const MIN_GAP = 2.4 * BALL_R; // espace libre minimal entre deux obstacles
 
 // --- Points ---
-export const PTS_PEG = 1;
-export const PTS_PEG_GOLDEN = 10;
+export const PTS_PEG_GOLDEN = 10; // pluie d'or : valeur minimale de tout taquet
+export const PEG_VALUES = [1, 5, 10, 30, 50] as const;
+export const PEG_SHARE = { 5: 0.07, 10: 0.03, 30: 0.01 } as const; // part des taquets par palier ; un seul 50 par carte
+export const RARE_PEG_SPACING = 200; // px minimum entre deux taquets à 30 ou 50
 export const PTS_SPINNER = 3;
 export const PTS_BUMPER = 5;
 export const HIT_COOLDOWN_MS = 150;

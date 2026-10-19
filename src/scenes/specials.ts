@@ -6,6 +6,7 @@ import {
   X2_MS, GOLD_MS, QUAKE_KICK, PEG_R,
 } from '../config';
 import { EFFECTS, pickEffect, type EffectId } from '../game/specials';
+import { PEG_TEX } from '../themes/apply';
 import type { Game, Ball, PegRt } from './Game';
 
 const hex = (c: string) => Phaser.Display.Color.HexStringToColor(c).color;
@@ -111,8 +112,9 @@ export class Specials {
     const g = this.game;
     this.idle = 0; // tirage impossible (aucun effet activé, carte sans taquet) : nouvel essai après un intervalle
     const id = pickEffect(params.specialEffects, g.ballCount < params.maxBalls, Math.random);
-    if (!id || !g.pegs.length || !this.mark || !this.halo) return;
-    const peg = g.pegs[Math.floor(Math.random() * g.pegs.length)];
+    const pool = g.pegs.filter((p) => p.value === 1); // tirage rare (secondes) : allocation acceptée
+    if (!id || !pool.length || !this.mark || !this.halo) return;
+    const peg = pool[Math.floor(Math.random() * pool.length)];
     this.peg = peg;
     this.effect = id;
     this.ttl = SPECIAL_TTL_MS;
@@ -140,6 +142,6 @@ export class Specials {
 
   private endGold() {
     this.goldMs = 0;
-    for (const p of this.game.pegs) p.img.setTexture('peg').setDisplaySize(PEG_R * 2, PEG_R * 2);
+    for (const p of this.game.pegs) p.img.setTexture(PEG_TEX[p.value]).setDisplaySize(PEG_R * 2, PEG_R * 2);
   }
 }

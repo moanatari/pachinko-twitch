@@ -2,7 +2,7 @@
 import { Rng } from './rng';
 import {
   BOARD_W, HEIGHT, WALL, PEG_R, BUMPER_R, SPINNER_R, RAMP_THICK,
-  SPAWN_ZONE, BIN_H, BIN_CLEAR, MIN_GAP, SPINNER_SPEED,
+  SPAWN_ZONE, BIN_H, BIN_CLEAR, MIN_GAP, SPINNER_SPEED, PEG_VALUES, PEG_SHARE, RARE_PEG_SPACING,
 } from './config';
 
 export const PATTERNS = ['classique', 'symetrique', 'diagonale', 'trous', 'entonnoirs'] as const;
@@ -11,7 +11,8 @@ export type PatternId = (typeof PATTERNS)[number];
 export interface Bounds { left: number; right: number; top: number; bottom: number }
 export const BOARD_BOUNDS: Bounds = { left: WALL, right: BOARD_W - WALL, top: 0, bottom: HEIGHT };
 
-export interface Peg { x: number; y: number; golden: boolean }
+export type PegValue = (typeof PEG_VALUES)[number];
+export interface Peg { x: number; y: number; value: PegValue } // valeur tirée après la pose (pegValues)
 export interface Ramp { x: number; y: number; length: number; angle: number } // centre, angle en rad
 export interface Spinner { x: number; y: number; radius: number; speed: number } // speed en rad/step, signe = sens
 export interface Bumper { x: number; y: number; radius: number }
@@ -156,7 +157,7 @@ class Builder {
     return true;
   }
 
-  peg(x: number, y: number, golden = this.rng.chance(0.03)) { return this.place([{ kind: 'peg', x, y, golden }]); }
+  peg(x: number, y: number) { return this.place([{ kind: 'peg', x, y, value: 1 }]); }
   bumper(x: number, y: number, radius = BUMPER_R) { return this.place([{ kind: 'bumper', x, y, radius }]); }
   spinner(x: number, y: number, radius = SPINNER_R) {
     return this.place([{ kind: 'spinner', x, y, radius, speed: this.spinnerSpeed() }]);
@@ -285,7 +286,7 @@ function symetrique(g: Builder) {
   for (let row = 0, y = g.playTop + PEG_R + 12; y < g.playBottom - PEG_R; y += dy, row++) {
     for (let x = cx - (row % 2) * (dx / 2); x > g.b.left + MIN_GAP + PEG_R; x -= dx) {
       const px = x + (Math.abs(x - cx) < 1 ? 0 : rng.range(-4, 4)), py = y + rng.range(-4, 4);
-      if (!mirrored.some((h) => inHole(h, px, py))) g.sym({ kind: 'peg', x: px, y: py, golden: rng.chance(0.03) });
+      if (!mirrored.some((h) => inHole(h, px, py))) g.sym({ kind: 'peg', x: px, y: py, value: 1 });
     }
   }
 }
@@ -350,6 +351,45 @@ function entonnoirs(g: Builder) {
   pegGrid(g, rng.range(72, 88), rng.range(60, 72));
 }
 
+/** Valeurs tirées après la pose, en nombres fixes : un seul 50 par carte, taquets à 30 et 50 espacés.
+ *  En symétrique, on tire des « unités » (taquet de l'axe ou paire miroir) : les valeurs restent en miroir. */
+function pegValues(g: Builder, symmetric: boolean) {
+  const { m, rng } = g;
+  const near = (a: number, c: number) => Math.abs(a - c) < 0.5;
+  const mx = (x: number) => g.b.left + g.b.right - x;
+  const units: Peg[][] = symmetric
+    ? m.pegs.filter((p) => p.x < g.cx + 0.5).flatMap((p) => {
+      if (near(p.x, g.cx)) return [[p]];
+      const q = m.pegs.find((o) => near(o.x, mx(p.x)) && near(o.y, p.y));
+      return q ? [[p, q]] : [];
+    })
+    : m.pegs.map((p) => [p]);
+  // axe vide (bumper central, trous) : un taquet posé sur l'axe pour porter le 50
+  for (let tries = 0; symmetric && !units.some((u) => u.length === 1) && tries < 60; tries++)
+    if (g.place([{ kind: 'peg', x: g.cx, y: rng.range(g.playTop, g.playBottom), value: 1 }])) units.push([m.pegs[m.pegs.length - 1]]);
+  for (let i = units.length - 1; i > 0; i--) {
+    const j = rng.int(0, i);
+    [units[i], units[j]] = [units[j], units[i]];
+  }
+  const rare: Peg[] = [];
+  const spaced = (u: Peg[]) => u.every((p) =>
+    [...rare, ...u].every((q) => q === p || Math.hypot(p.x - q.x, p.y - q.y) >= RARE_PEG_SPACING));
+  const take = (value: PegValue, count: number, ok: (u: Peg[]) => boolean) => {
+    for (let i = 0, n = 0; i < units.length && n < count; i++) {
+      const u = units[i];
+      if (u[0].value !== 1 || !ok(u)) continue;
+      for (const p of u) p.value = value;
+      n += u.length;
+      if (value >= 30) rare.push(...u);
+    }
+  };
+  const n = m.pegs.length;
+  take(50, 1, (u) => u.length === 1);
+  take(30, Math.max(1, Math.round(n * PEG_SHARE[30])), spaced);
+  take(10, Math.round(n * PEG_SHARE[10]), () => true);
+  take(5, Math.round(n * PEG_SHARE[5]), () => true);
+}
+
 const GENERATORS: Record<PatternId, (g: Builder) => void> = { classique, symetrique, diagonale, trous, entonnoirs };
 
 export function generateMap(seed: number, pattern?: PatternId, b: Bounds = BOARD_BOUNDS): MapData {
@@ -361,5 +401,6 @@ export function generateMap(seed: number, pattern?: PatternId, b: Bounds = BOARD
   const g = new Builder(m, b, rng);
   wallGuides(g, p === 'symetrique');
   GENERATORS[p](g);
+  pegValues(g, p === 'symetrique');
   return m;
 }

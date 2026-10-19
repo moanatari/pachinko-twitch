@@ -54,7 +54,7 @@ terminée et vérifiée.
 - [x] 16. Fin de partie nette + lien copiable des réglages
 - [x] 17. Réglages enregistrés automatiquement, croix de fermeture, lien OBS sans menu (`menu=0`)
 - [x] 18. Chaîne connectée par un bouton, état de la connexion affiché
-- [ ] 19. Taquets à valeur (1, 5, 10, 30, 50) (spec `docs/superpowers/specs/2026-10-19-mobiles-couloir-bacs-taquets-design.md`, plan `docs/superpowers/plans/2026-10-19-mobiles-couloir-bacs-taquets.md`)
+- [x] 19. Taquets à valeur (1, 5, 10, 30, 50) (spec `docs/superpowers/specs/2026-10-19-mobiles-couloir-bacs-taquets-design.md`, plan `docs/superpowers/plans/2026-10-19-mobiles-couloir-bacs-taquets.md`)
 - [ ] 20. Barres bumpers et hélices longues (même spec, même plan)
 - [ ] 21. Éléments mobiles (même spec, même plan)
 - [ ] 22. Couloir du bas (même spec, même plan)
@@ -693,11 +693,12 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
 - [x] **Vérif** : `npm run test` et `npm run verify` verts.
 
 ### 19. Taquets à valeur
-- [ ] `Peg.value` (1, 5, 10, 30, 50) en nombres fixes par carte, un seul 50, 30 et 50 espacés, miroir en symétrique.
-- [ ] Textures `peg5`, `peg30`, `peg50` (le 10 garde `pegGolden`), halos, étincelles selon la valeur.
-- [ ] Taquets spéciaux sur les taquets à 1 point ; pluie d'or : au moins 10 points, chaque taquet retrouve sa texture.
+- [x] `Peg.value` (1, 5, 10, 30, 50) en nombres fixes par carte, un seul 50, 30 et 50 espacés, miroir en symétrique.
+- [x] Textures `peg5`, `peg30`, `peg50` (le 10 garde `pegGolden`), halos, étincelles selon la valeur.
+- [x] Taquets spéciaux sur les taquets à 1 point ; pluie d'or : au moins 10 points, chaque taquet retrouve sa texture.
 - ⚠️ La carte d'une seed change (tirages modifiés) : l'historique rejoue une carte différente pour les anciennes parties.
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps à `?debug=1&bots=150` ; chaque thème (touche T).
+- [x] **Vérif** : `npm run test` (246) et `npm run verify` verts, 158 fps headless à 150 billes.
+      À valider à l'œil sur `dev` : rendu des paliers dans chaque thème (touche T).
 
 ### 20. Barres bumpers et hélices longues
 - [ ] `Bar` (capsule, rebond perpendiculaire), une fois sur trois à la place d'un bumper dans les motifs.

@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import {
   params, BOARD_W, HEIGHT, WALL, BALL_R, PEG_R, MAX_SPEED, RAMP_THICK, SPINNER_ARM,
-  PTS_PEG, PTS_PEG_GOLDEN, PTS_BUMPER, PTS_SPINNER, HIT_COOLDOWN_MS, BUMPER_SPEED,
+  PTS_PEG_GOLDEN, PTS_BUMPER, PTS_SPINNER, HIT_COOLDOWN_MS, BUMPER_SPEED,
   STUCK_NUDGE_MS, STUCK_KILL_MS, PODIUM_MS, BIG_WIN,
 } from '../config';
-import { generateMap, PATTERNS, type MapData, type PatternId } from '../mapgen';
-import { applyTheme } from '../themes/apply';
+import { generateMap, PATTERNS, type MapData, type PatternId, type PegValue } from '../mapgen';
+import { applyTheme, PEG_TEX } from '../themes/apply';
 import { resolveTheme, todayMMDD } from '../themes/resolve';
 import type { Theme } from '../themes/types';
 import { setupDebug } from '../debug';
@@ -42,13 +42,13 @@ interface El {
   kind: 'peg' | 'bin' | 'bumper' | 'spinner';
   points: number;
   pulse: Pulse;
-  golden?: boolean;
   binX?: number; // centre du bac (pop-up)
 }
 
 interface SpinnerRt { body: Body; img: Phaser.GameObjects.Image; speed: number }
 /** Taquet non doré de la carte : candidat aux taquets spéciaux, repeint par la pluie d'or. */
-export interface PegRt { x: number; y: number; bodyId: number; img: Phaser.GameObjects.Image }
+/** Taquet à moins de 10 points : repeint par la pluie d'or ; ceux à 1 point sont candidats aux taquets spéciaux. */
+export interface PegRt { x: number; y: number; bodyId: number; img: Phaser.GameObjects.Image; value: PegValue }
 
 const DIVIDER = 6;
 const hex = (c: string) => Phaser.Display.Color.HexStringToColor(c).color;
@@ -289,13 +289,11 @@ export class Game extends Phaser.Scene {
 
     for (const p of map.pegs) {
       const body = this.staticBody(this.matter.add.circle(p.x, p.y, PEG_R, { isStatic: true, label: 'peg' }));
-      if (p.golden) this.halo(p.x, p.y, PEG_R * 5, pal.pegGolden);
-      const img = this.track(this.add.image(p.x, p.y, p.golden ? 'pegGolden' : 'peg').setDisplaySize(PEG_R * 2, PEG_R * 2));
-      if (!p.golden) this.pegs.push({ x: p.x, y: p.y, bodyId: body.id, img });
-      this.els.set(body.id, {
-        kind: 'peg', points: p.golden ? PTS_PEG_GOLDEN : PTS_PEG, golden: p.golden,
-        pulse: { kind: 'peg', v: 0, img, size: PEG_R * 2 },
-      });
+      if (p.value >= 10)
+        this.halo(p.x, p.y, PEG_R * (p.value === 50 ? 9 : 5), p.value === 10 ? pal.pegGolden : p.value === 30 ? pal.bumperCore : pal.text);
+      const img = this.track(this.add.image(p.x, p.y, PEG_TEX[p.value]).setDisplaySize(PEG_R * 2, PEG_R * 2));
+      if (p.value < 10) this.pegs.push({ x: p.x, y: p.y, bodyId: body.id, img, value: p.value });
+      this.els.set(body.id, { kind: 'peg', points: p.value, pulse: { kind: 'peg', v: 0, img, size: PEG_R * 2 } });
     }
 
     for (const r of map.ramps) {
@@ -450,10 +448,10 @@ export class Game extends Phaser.Scene {
       const last = ball.hits.get(other.id) ?? -Infinity;
       if (this.time.now - last < HIT_COOLDOWN_MS) continue;
       ball.hits.set(other.id, this.time.now);
-      const gold = el.kind === 'peg' && this.specials.gold;
-      const pts = this.score(ball, gold ? PTS_PEG_GOLDEN : el.points, x, y);
+      const base = el.kind === 'peg' && this.specials.gold ? Math.max(PTS_PEG_GOLDEN, el.points) : el.points;
+      const pts = this.score(ball, base, x, y);
       this.fx.popup(x, y, pts);
-      if (el.kind === 'peg') this.fx.peg(el.pulse, x, y, !!el.golden || gold);
+      if (el.kind === 'peg') this.fx.peg(el.pulse, x, y, pts);
       else if (el.kind === 'bumper') this.fx.bumper(el.pulse, x, y);
       else this.fx.spinner(el.pulse, x, y);
     }
