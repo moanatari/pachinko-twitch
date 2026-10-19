@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  params, BOARD_W, HEIGHT, WALL, BALL_R, PEG_R, MAX_SPEED, RAMP_THICK, SPINNER_ARM,
+  params, BOARD_W, HEIGHT, WALL, BALL_R, PEG_R, MAX_SPEED, RAMP_THICK, SPINNER_ARM, BAR_THICK, SPINNER_R,
   PTS_PEG_GOLDEN, PTS_BUMPER, PTS_SPINNER, HIT_COOLDOWN_MS, BUMPER_SPEED,
   STUCK_NUDGE_MS, STUCK_KILL_MS, PODIUM_MS, BIG_WIN,
 } from '../config';
@@ -40,6 +40,7 @@ export interface Ball {
 
 interface El {
   kind: 'peg' | 'bin' | 'bumper' | 'spinner';
+  half?: number; // barre bumper : demi-longueur (rebond)
   points: number;
   pulse: Pulse;
   binX?: number; // centre du bac (pop-up)
@@ -312,6 +313,18 @@ export class Game extends Phaser.Scene {
       this.els.set(body.id, { kind: 'bumper', points: PTS_BUMPER, pulse: { kind: 'bumper', v: 0, img, size: b.radius * 2, glow } });
     }
 
+    for (const r of map.bars) {
+      const body = this.staticBody(this.matter.add.rectangle(r.x, r.y, r.length, BAR_THICK,
+        { isStatic: true, angle: r.angle, chamfer: { radius: BAR_THICK / 2 }, label: 'bumper' }));
+      const img = this.track(this.add.image(r.x, r.y, 'bar').setDisplaySize(r.length, BAR_THICK).setRotation(r.angle));
+      const glow = this.track(this.add.image(r.x, r.y, 'fx-glow').setDisplaySize(r.length * 1.1, BAR_THICK * 3)
+        .setRotation(r.angle).setBlendMode('ADD').setTint(hex(pal.bumperCore)).setAlpha(0));
+      this.els.set(body.id, {
+        kind: 'bumper', points: PTS_BUMPER, half: r.length / 2,
+        pulse: { kind: 'bumper', v: 0, img, size: r.length, h: BAR_THICK, glow },
+      });
+    }
+
     for (const s of map.spinners) {
       // croix : deux barres fusionnées en un corps composé statique, tourné à chaque pas
       const parts = [0, Math.PI / 2].map((angle) =>
@@ -319,7 +332,7 @@ export class Game extends Phaser.Scene {
       const body = this.matter.body.create({ parts, isStatic: true, label: 'spinner' });
       this.matter.world.add(body);
       this.staticBody(body);
-      const img = this.track(this.add.image(s.x, s.y, 'spinner').setDisplaySize(s.radius * 2, s.radius * 2));
+      const img = this.track(this.add.image(s.x, s.y, s.radius > SPINNER_R ? 'spinnerLong' : 'spinner').setDisplaySize(s.radius * 2, s.radius * 2));
       this.spinners.push({ body, img, speed: s.speed });
       this.els.set(body.id, { kind: 'spinner', points: PTS_SPINNER, pulse: { kind: 'spinner', v: 0, img } });
     }
@@ -443,7 +456,7 @@ export class Game extends Phaser.Scene {
         this.toRemove.push(ball);
         continue;
       }
-      if (el.kind === 'bumper') this.bounce(ball, other);
+      if (el.kind === 'bumper') this.bounce(ball, other, el.half);
       else if (el.kind === 'peg') this.specials.hit(other.id, ball); // avant le cooldown : le 1er contact compte toujours
       const last = ball.hits.get(other.id) ?? -Infinity;
       if (this.time.now - last < HIT_COOLDOWN_MS) continue;
@@ -457,10 +470,15 @@ export class Game extends Phaser.Scene {
     }
   }
 
-  /** Bumper : vitesse imposée le long de la normale, biaisée vers le haut. */
-  private bounce(ball: Ball, bumper: Body) {
-    let nx = ball.body.position.x - bumper.position.x;
-    let ny = ball.body.position.y - bumper.position.y - 0.6 * Math.hypot(nx, ball.body.position.y - bumper.position.y);
+  /** Bumper : vitesse imposée le long de la normale, biaisée vers le haut. Barre : la normale part du
+   *  point de la barre le plus proche de la bille (half = 0 : bumper rond). */
+  private bounce(ball: Ball, bumper: Body, half = 0) {
+    const c = Math.cos(bumper.angle), s = Math.sin(bumper.angle);
+    const { x, y } = ball.body.position;
+    const t = Phaser.Math.Clamp((x - bumper.position.x) * c + (y - bumper.position.y) * s, -half, half);
+    const cx = bumper.position.x + t * c, cy = bumper.position.y + t * s;
+    let nx = x - cx;
+    let ny = y - cy - 0.6 * Math.hypot(nx, y - cy);
     const len = Math.hypot(nx, ny) || 1;
     nx /= len;
     ny /= len;

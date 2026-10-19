@@ -2,6 +2,7 @@
 import { Rng } from './rng';
 import {
   BOARD_W, HEIGHT, WALL, PEG_R, BUMPER_R, SPINNER_R, RAMP_THICK,
+  BAR_THICK, BAR_LEN_MIN, BAR_LEN_MAX, BAR_SHARE, SPINNER_R_LONG, SPINNER_LONG_SHARE, SPINNER_LONG_SPEED,
   SPAWN_ZONE, BIN_H, BIN_CLEAR, MIN_GAP, SPINNER_SPEED, PEG_VALUES, PEG_SHARE, RARE_PEG_SPACING,
 } from './config';
 
@@ -14,6 +15,7 @@ export const BOARD_BOUNDS: Bounds = { left: WALL, right: BOARD_W - WALL, top: 0,
 export type PegValue = (typeof PEG_VALUES)[number];
 export interface Peg { x: number; y: number; value: PegValue } // valeur tirée après la pose (pegValues)
 export interface Ramp { x: number; y: number; length: number; angle: number } // centre, angle en rad
+export interface Bar { x: number; y: number; length: number; angle: number } // barre bumper : centre, angle en rad
 export interface Spinner { x: number; y: number; radius: number; speed: number } // speed en rad/step, signe = sens
 export interface Bumper { x: number; y: number; radius: number }
 export interface Bin { x: number; width: number; points: number } // x = bord gauche
@@ -24,6 +26,7 @@ export interface MapData {
   ramps: Ramp[];
   spinners: Spinner[];
   bumpers: Bumper[];
+  bars: Bar[];
   bins: Bin[];
   binTop: number;
 }
@@ -34,10 +37,12 @@ export const RAMP_MIN_ANGLE = 0.25; // rad : en dessous, la bille s'arrête sur 
 interface Shape { x1: number; y1: number; x2: number; y2: number; r: number; name: string }
 
 const circle = (x: number, y: number, r: number, name: string): Shape => ({ x1: x, y1: y, x2: x, y2: y, r, name });
-const rampShape = (p: Ramp): Shape => {
-  const dx = (Math.cos(p.angle) * p.length) / 2, dy = (Math.sin(p.angle) * p.length) / 2;
-  return { x1: p.x - dx, y1: p.y - dy, x2: p.x + dx, y2: p.y + dy, r: RAMP_THICK / 2, name: 'rampe' };
+const segment = (x: number, y: number, length: number, angle: number, r: number, name: string): Shape => {
+  const dx = (Math.cos(angle) * length) / 2, dy = (Math.sin(angle) * length) / 2;
+  return { x1: x - dx, y1: y - dy, x2: x + dx, y2: y + dy, r, name };
 };
+const rampShape = (p: Ramp) => segment(p.x, p.y, p.length, p.angle, RAMP_THICK / 2, 'rampe');
+const barShape = (p: Bar) => segment(p.x, p.y, p.length, p.angle, BAR_THICK / 2, 'barre');
 
 function pointSeg(px: number, py: number, s: Shape): number {
   const vx = s.x2 - s.x1, vy = s.y2 - s.y1;
@@ -90,6 +95,7 @@ function shapesOf(m: MapData): Shape[] {
     ...m.bumpers.map((p) => circle(p.x, p.y, p.radius, 'bumper')),
     ...m.spinners.map((p) => circle(p.x, p.y, p.radius, 'tourniquet')), // rayon de balayage complet
     ...m.ramps.map(rampShape),
+    ...m.bars.map(barShape),
   ];
 }
 
@@ -123,12 +129,14 @@ type Spec =
   | ({ kind: 'peg' } & Peg)
   | ({ kind: 'bumper' } & Bumper)
   | ({ kind: 'spinner' } & Spinner)
+  | ({ kind: 'bar' } & Bar)
   | ({ kind: 'ramp' } & Ramp);
 
 const shapeOf = (s: Spec): Shape =>
   s.kind === 'peg' ? circle(s.x, s.y, PEG_R, 'taquet')
     : s.kind === 'bumper' ? circle(s.x, s.y, s.radius, 'bumper')
     : s.kind === 'spinner' ? circle(s.x, s.y, s.radius, 'tourniquet') // rayon de balayage complet
+    : s.kind === 'bar' ? barShape(s)
     : rampShape(s);
 
 class Builder {
@@ -152,6 +160,7 @@ class Builder {
       if (kind === 'peg') this.m.pegs.push(e as Peg);
       else if (kind === 'bumper') this.m.bumpers.push(e as Bumper);
       else if (kind === 'spinner') this.m.spinners.push(e as Spinner);
+      else if (kind === 'bar') this.m.bars.push(e as Bar);
       else this.m.ramps.push(e as Ramp);
     }
     return true;
@@ -159,19 +168,30 @@ class Builder {
 
   peg(x: number, y: number) { return this.place([{ kind: 'peg', x, y, value: 1 }]); }
   bumper(x: number, y: number, radius = BUMPER_R) { return this.place([{ kind: 'bumper', x, y, radius }]); }
-  spinner(x: number, y: number, radius = SPINNER_R) {
-    return this.place([{ kind: 'spinner', x, y, radius, speed: this.spinnerSpeed() }]);
+  spinner(x: number, y: number, radius = this.spinnerRadius()) {
+    return this.place([{ kind: 'spinner', x, y, radius, speed: this.spinnerSpeed(radius) }]);
   }
   ramp(x: number, y: number, length: number, angle: number) { return this.place([{ kind: 'ramp', x, y, length, angle }]); }
 
-  spinnerSpeed() { return this.rng.pick([-1, 1]) * SPINNER_SPEED * this.rng.range(0.7, 1.3); }
+  spinnerRadius() { return this.rng.chance(SPINNER_LONG_SHARE) ? SPINNER_R_LONG : SPINNER_R; }
+
+  spinnerSpeed(radius = SPINNER_R) {
+    return this.rng.pick([-1, 1]) * SPINNER_SPEED * this.rng.range(0.7, 1.3) * (radius > SPINNER_R ? SPINNER_LONG_SPEED : 1);
+  }
+
+  /** Bumper rond ou, une fois sur trois, barre bumper. */
+  bumperSpec(x: number, y: number): Spec {
+    return this.rng.chance(BAR_SHARE)
+      ? { kind: 'bar', x, y, length: this.rng.range(BAR_LEN_MIN, BAR_LEN_MAX), angle: this.rng.range(-0.6, 0.6) }
+      : { kind: 'bumper', x, y, radius: BUMPER_R };
+  }
 
   get cx() { return (this.b.left + this.b.right) / 2; }
 
   /** Image miroir par rapport à l'axe vertical central (rampes et tourniquets inversés). */
   mirror(s: Spec): Spec {
     const x = this.b.left + this.b.right - s.x;
-    if (s.kind === 'ramp') return { ...s, x, angle: -s.angle };
+    if (s.kind === 'ramp' || s.kind === 'bar') return { ...s, x, angle: -s.angle };
     if (s.kind === 'spinner') return { ...s, x, speed: -s.speed };
     return { ...s, x };
   }
@@ -254,7 +274,7 @@ function ensureBumpers(g: Builder, n: number) {
 function classique(g: Builder) {
   const holes = carveHoles(g, g.rng.int(2, 4), 90, 140);
   for (const h of holes) {
-    if (g.rng.chance(0.7)) g.bumper(h.x, h.y);
+    if (g.rng.chance(0.7)) g.place([g.bumperSpec(h.x, h.y)]);
     else g.spinner(h.x, h.y);
   }
   ensureBumpers(g, 2);
@@ -273,8 +293,11 @@ function symetrique(g: Builder) {
     if (holes.every((o) => Math.hypot(o.x - h.x, o.y - h.y) > o.r + h.r)) holes.push(h);
   }
   for (const h of holes) {
-    if (rng.chance(0.6)) g.sym({ kind: 'bumper', x: h.x, y: h.y, radius: BUMPER_R });
-    else g.sym({ kind: 'spinner', x: h.x, y: h.y, radius: SPINNER_R, speed: g.spinnerSpeed() });
+    if (rng.chance(0.6)) g.sym(g.bumperSpec(h.x, h.y));
+    else {
+      const radius = g.spinnerRadius();
+      g.sym({ kind: 'spinner', x: h.x, y: h.y, radius, speed: g.spinnerSpeed(radius) });
+    }
   }
   if (rng.chance(0.6)) {
     // paire de rampes en chevron, symétrique
@@ -320,7 +343,7 @@ function diagonale(g: Builder) {
 function trous(g: Builder) {
   const holes = carveHoles(g, g.rng.int(3, 6), 80, 130, true);
   for (const h of holes) {
-    if (g.rng.chance(0.5)) g.bumper(h.x, h.y);
+    if (g.rng.chance(0.5)) g.place([g.bumperSpec(h.x, h.y)]);
     else g.spinner(h.x, h.y);
   }
   ensureBumpers(g, 2);
@@ -337,16 +360,17 @@ function entonnoirs(g: Builder) {
     const count = level === 0 ? rng.int(1, 2) : rng.int(1, 2);
     for (let k = 0; k < count; k++) {
       const fx = g.b.left + ((k + 0.5) / count) * (g.b.right - g.b.left) + rng.range(-60, 60);
+      const radius = g.spinnerRadius();
       const L = rng.range(150, 210), a = rng.range(0.42, 0.6);
       const dx = (L / 2) * Math.cos(a), dy = (L / 2) * Math.sin(a);
       const ok = g.place([
         { kind: 'ramp', x: fx - gap / 2 - dx, y: yb - dy, length: L, angle: a },
         { kind: 'ramp', x: fx + gap / 2 + dx, y: yb - dy, length: L, angle: -a },
       ]);
-      if (ok) g.spinner(fx, yb + SPINNER_R + MIN_GAP + 12);
+      if (ok) g.spinner(fx, yb + radius + MIN_GAP + 12, radius);
     }
   });
-  if (!g.m.spinners.length) g.spinner(g.cx, g.playTop + H * 0.4);
+  if (!g.m.spinners.length) g.spinner(g.cx, g.playTop + H * 0.4, SPINNER_R);
   ensureBumpers(g, 2);
   pegGrid(g, rng.range(72, 88), rng.range(60, 72));
 }
@@ -396,7 +420,7 @@ export function generateMap(seed: number, pattern?: PatternId, b: Bounds = BOARD
   const rng = new Rng(seed);
   const p = pattern ?? rng.pick(PATTERNS);
   const m: MapData = {
-    seed, pattern: p, pegs: [], ramps: [], spinners: [], bumpers: [], bins: makeBins(rng, b, p === 'symetrique'), binTop: b.bottom - BIN_H,
+    seed, pattern: p, pegs: [], ramps: [], spinners: [], bumpers: [], bars: [], bins: makeBins(rng, b, p === 'symetrique'), binTop: b.bottom - BIN_H,
   };
   const g = new Builder(m, b, rng);
   wallGuides(g, p === 'symetrique');
