@@ -41,14 +41,31 @@ export const BUMPER_R = 26;
 export const SPINNER_R = 46; // demi-longueur d'un bras
 export const SPINNER_ARM = 10; // épaisseur des bras
 export const RAMP_THICK = 12;
+export const BAR_THICK = 14; // barre bumper
+export const BAR_LEN_MIN = 90;
+export const BAR_LEN_MAX = 160;
+export const BAR_SHARE = 1 / 3; // part des bumpers posés en barre
+export const SPINNER_R_LONG = 75; // hélice longue
+export const SPINNER_LONG_SHARE = 1 / 3;
+export const SPINNER_LONG_SPEED = 0.7; // une hélice longue tourne moins vite
+export const MOVERS_MIN = 2; // éléments en aller-retour par carte (hors couloir)
+export const MOVERS_MAX = 4;
+export const MOVE_LEN_MIN = 150; // px
+export const MOVE_LEN_MAX = 350;
+export const MOVE_PERIOD_MIN = 4000; // ms par aller-retour
+export const MOVE_PERIOD_MAX = 8000;
+export const LANE_BAR_LEN = 140; // barre du couloir du bas
+export const LANE_PERIOD_MS = 9000; // aller-retour du couloir, plus lent que les mobiles du plateau
 export const SPAWN_ZONE = 120; // bande libre en haut
 export const BIN_H = 110; // hauteur des bacs
 export const BIN_CLEAR = 70; // bande libre au-dessus des bacs
 export const MIN_GAP = 2.4 * BALL_R; // espace libre minimal entre deux obstacles
 
 // --- Points ---
-export const PTS_PEG = 1;
-export const PTS_PEG_GOLDEN = 10;
+export const PTS_PEG_GOLDEN = 10; // pluie d'or : valeur minimale de tout taquet
+export const PEG_VALUES = [1, 5, 10, 30, 50] as const;
+export const PEG_SHARE = { 5: 0.07, 10: 0.03, 30: 0.01 } as const; // part des taquets par palier ; un seul 50 par carte
+export const RARE_PEG_SPACING = 200; // px minimum entre deux taquets à 30 ou 50
 export const PTS_SPINNER = 3;
 export const PTS_BUMPER = 5;
 export const HIT_COOLDOWN_MS = 150;
@@ -75,5 +92,10 @@ export const QUAKE_KICK = 9; // px / step vers le haut
 
 // --- Partie ---
 export const PODIUM_MS = 15000;
+export const BIN_SCROLL_MS = 800; // glissement de la bande des bacs
+export const ATTRACT_EVERY_MS = 1500; // billes d'animation pendant l'attente
+export const ATTRACT_MAX = 6;
+export const ATTRACT_POP_MS = 400; // figées puis éclatées à la première vraie bille
+export const ATTRACT_ALPHA = 0.7;
 
 export const params = parseParams(typeof location === 'undefined' ? '' : location.search, loadSettings(safeStorage()));

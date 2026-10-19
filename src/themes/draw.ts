@@ -1,7 +1,7 @@
 // Fonctions de dessin (Canvas 2D uniquement) : chaque texture est dessinée une fois par thème.
 // Les canvas font 2× la taille de la hitbox (voir apply.ts) puis sont réduits à l'affichage.
 import type { DrawFn } from './types';
-import { WALL } from '../config';
+import { WALL, SPINNER_R, SPINNER_R_LONG } from '../config';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -43,6 +43,42 @@ export const drawPegGolden: DrawFn = (ctx, w, _h, p) => {
   disc(ctx, r, r, r * 0.98);
 };
 
+/** Taquet à 5 : chrome. */
+export const drawPegChrome: DrawFn = (ctx, w, _h, p) => {
+  const r = w / 2;
+  const g = ctx.createRadialGradient(r * 0.7, r * 0.6, r * 0.1, r, r, r);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.35, p.bumperRing);
+  g.addColorStop(1, '#3a3f48');
+  ctx.fillStyle = g;
+  disc(ctx, r, r, r * 0.95);
+};
+
+/** Taquet à 30 : rouge laqué cerclé d'or. */
+export const drawPegRed: DrawFn = (ctx, w, _h, p) => {
+  const r = w / 2;
+  ctx.fillStyle = p.accent;
+  disc(ctx, r, r, r * 0.98);
+  const g = ctx.createRadialGradient(r * 0.7, r * 0.6, r * 0.05, r, r, r * 0.8);
+  g.addColorStop(0, '#ffd0d0');
+  g.addColorStop(0.35, p.bumperCore);
+  g.addColorStop(1, '#3a0008');
+  ctx.fillStyle = g;
+  disc(ctx, r, r, r * 0.8);
+};
+
+/** Taquet à 50 : blanc éclatant (le gros halo fait le reste). */
+export const drawPegBright: DrawFn = (ctx, w) => {
+  const r = w / 2;
+  const g = ctx.createRadialGradient(r * 0.7, r * 0.6, 0, r, r, r);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.6, '#fff8e0');
+  g.addColorStop(0.9, '#ffe9a8');
+  g.addColorStop(1, '#ffffff');
+  ctx.fillStyle = g;
+  disc(ctx, r, r, r * 0.98);
+};
+
 /** Taquet spécial : perle blanche à liseré, teintée à l'usage de la couleur de l'effet. */
 export const drawPegSpecial: DrawFn = (ctx, w) => {
   const r = w / 2;
@@ -75,9 +111,10 @@ export const drawBumper: DrawFn = (ctx, w, h, p) => {
   shine(ctx, r * 0.72, r * 0.58, r * 0.22, r * 0.11);
 };
 
-/** Croix chrome à moyeu rouge laqué (le canvas couvre tout le rayon de balayage). */
-export const drawSpinner: DrawFn = (ctx, w, h, p) => {
-  const c = w / 2, arm = w * 0.11;
+/** Croix chrome à moyeu rouge laqué (le canvas couvre tout le rayon de balayage).
+ *  `k` affine bras et moyeu d'une hélice longue : même épaisseur à l'écran qu'une hélice normale. */
+const cross = (k: number): DrawFn => (ctx, w, h, p) => {
+  const c = w / 2, arm = w * 0.11 * k;
   const g = ctx.createLinearGradient(0, 0, w, h);
   g.addColorStop(0, '#ffffff');
   g.addColorStop(0.5, p.spinner);
@@ -92,12 +129,30 @@ export const drawSpinner: DrawFn = (ctx, w, h, p) => {
     ctx.fill();
     ctx.restore();
   }
-  const hub = ctx.createRadialGradient(c * 0.92, c * 0.9, 1, c, c, w * 0.12);
+  const hub = ctx.createRadialGradient(c * 0.92, c * 0.9, 1, c, c, w * 0.12 * k);
   hub.addColorStop(0, '#ff8a8a');
   hub.addColorStop(0.5, '#c8102e');
   hub.addColorStop(1, '#4a0010');
   ctx.fillStyle = hub;
-  disc(ctx, c, c, w * 0.12);
+  disc(ctx, c, c, w * 0.12 * k);
+};
+export const drawSpinner = cross(1);
+export const drawSpinnerLong = cross(SPINNER_R / SPINNER_R_LONG);
+
+/** Barre bumper : gaine chrome, cœur rouge laqué (étirée à la longueur de chaque barre). */
+export const drawBar: DrawFn = (ctx, w, h, p) => {
+  const ring = ctx.createLinearGradient(0, 0, 0, h);
+  ring.addColorStop(0, '#ffffff');
+  ring.addColorStop(0.45, p.bumperRing);
+  ring.addColorStop(1, '#4b515c');
+  ctx.fillStyle = ring;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, h / 2);
+  ctx.fill();
+  ctx.fillStyle = p.bumperCore;
+  ctx.beginPath();
+  ctx.roundRect(h * 0.3, h * 0.3, w - h * 0.6, h * 0.4, h * 0.2);
+  ctx.fill();
 };
 
 /** Barre de laiton biseautée. */

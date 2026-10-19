@@ -68,7 +68,7 @@ describe('mergeSettings', () => {
 
 describe('settingsQuery (lien copiable)', () => {
   const s: Settings = {
-    channel: 'machaine', duration: 3, maxBalls: 80, theme: 'noel', shake: false, autoNext: false,
+    channel: 'machaine', duration: 3, maxBalls: 80, theme: 'noel', shake: false, autoNext: false, lane: false, attract: false, binScroll: 45,
     specialEvery: 45, specialEffects: 'moon,warp',
   };
   it('aller-retour : le lien redonne exactement les réglages', () =>
@@ -135,4 +135,28 @@ describe('taquets spéciaux', () => {
     expect(formPatch({ specialEvery: '0', specialEffects: ALL_EFFECTS }, DEFAULT_SETTINGS)).toEqual({ specialEvery: 0 });
     expect(formPatch({ specialEvery: '20', specialEffects: '' }, DEFAULT_SETTINGS)).toEqual({ specialEffects: '' });
   });
+});
+
+describe('couloir du bas', () => {
+  it('activé par défaut', () => expect(DEFAULT_SETTINGS.lane).toBe(true));
+  it('lane=0 dans l\'URL', () => expect(mergeSettings(DEFAULT_SETTINGS, {}, '?lane=0').lane).toBe(false));
+  it('valeur sauvegardée invalide → défaut', () => expect(mergeSettings(DEFAULT_SETTINGS, { lane: 'non' }, '').lane).toBe(true));
+  it('formPatch : case décochée', () => expect(formPatch({ ...DEFAULT_SETTINGS, lane: false }, DEFAULT_SETTINGS)).toEqual({ lane: false }));
+});
+
+describe('bacs qui défilent', () => {
+  it('toutes les 30 s par défaut', () => expect(DEFAULT_SETTINGS.binScroll).toBe(30));
+  it('borné 0–300, 0 = désactivé', () => {
+    expect(mergeSettings(DEFAULT_SETTINGS, {}, '?binScroll=999').binScroll).toBe(300);
+    expect(mergeSettings(DEFAULT_SETTINGS, {}, '?binScroll=-1').binScroll).toBe(0);
+    expect(mergeSettings(DEFAULT_SETTINGS, {}, '?binScroll=45').binScroll).toBe(45);
+  });
+  it('valeur sauvegardée invalide → défaut', () => expect(mergeSettings(DEFAULT_SETTINGS, { binScroll: 'x' }, '').binScroll).toBe(30));
+  it('formPatch : liste du menu', () => expect(formPatch({ ...DEFAULT_SETTINGS, binScroll: '60' }, DEFAULT_SETTINGS)).toEqual({ binScroll: 60 }));
+});
+
+describe('billes d\'animation', () => {
+  it('activées par défaut', () => expect(DEFAULT_SETTINGS.attract).toBe(true));
+  it('attract=0 dans l\'URL', () => expect(mergeSettings(DEFAULT_SETTINGS, {}, '?attract=0').attract).toBe(false));
+  it('valeur sauvegardée invalide → défaut', () => expect(mergeSettings(DEFAULT_SETTINGS, { attract: 1 }, '').attract).toBe(true));
 });

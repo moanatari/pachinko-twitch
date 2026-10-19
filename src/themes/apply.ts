@@ -2,8 +2,9 @@
 import Phaser from 'phaser';
 import type { Theme, SpriteSource, DrawFn } from './types';
 import * as D from './draw';
+import type { PegValue } from '../mapgen';
 import { KANJI_FONT } from './base';
-import { PEG_R, BUMPER_R, SPINNER_R, BALL_R, RAMP_THICK, BOARD_W, HEIGHT } from '../config';
+import { PEG_R, BUMPER_R, SPINNER_R, BALL_R, RAMP_THICK, BAR_THICK, SPINNER_R_LONG, BOARD_W, HEIGHT } from '../config';
 
 export const TEX_SCALE = 2; // textures dessinées à 2× puis réduites (net en 1080p)
 
@@ -11,9 +12,12 @@ const square = (r: number): [number, number] => [r * 2 * TEX_SCALE, r * 2 * TEX_
 const SIZES: Record<string, [number, number]> = {
   peg: square(PEG_R),
   pegGolden: square(PEG_R),
+  peg5: square(PEG_R), peg30: square(PEG_R), peg50: square(PEG_R),
   pegSpecial: square(PEG_R),
   bumper: square(BUMPER_R),
   spinner: square(SPINNER_R),
+  spinnerLong: square(SPINNER_R_LONG),
+  bar: [256, BAR_THICK * TEX_SCALE], // étirée à la longueur de chaque barre
   ramp: [256, RAMP_THICK * TEX_SCALE], // étirée à la longueur de chaque rampe
   background: [BOARD_W, HEIGHT],
   ball: square(BALL_R),
@@ -29,9 +33,11 @@ const SIZES: Record<string, [number, number]> = {
 const DEFAULTS: Record<string, DrawFn> = {
   peg: D.drawPeg,
   pegGolden: D.drawPegGolden,
+  peg5: D.drawPegChrome, peg30: D.drawPegRed, peg50: D.drawPegBright,
   pegSpecial: D.drawPegSpecial,
   bumper: D.drawBumper,
   spinner: D.drawSpinner,
+  spinnerLong: D.drawSpinnerLong, bar: D.drawBar,
   ramp: D.drawRamp,
   background: D.drawBackground,
   ball: D.drawBall,
@@ -43,6 +49,9 @@ const DEFAULTS: Record<string, DrawFn> = {
   'fx-glow': D.drawSpark,
   ambient: D.drawSpark,
 };
+
+/** Texture de chaque palier de taquet (le 10 garde l'ancienne clé du taquet doré). */
+export const PEG_TEX: Record<PegValue, string> = { 1: 'peg', 5: 'peg5', 10: 'pegGolden', 30: 'peg30', 50: 'peg50' };
 
 export async function applyTheme(scene: Phaser.Scene, theme: Theme): Promise<void> {
   const sources: Record<string, SpriteSource | null | undefined> = {
@@ -56,7 +65,8 @@ export async function applyTheme(scene: Phaser.Scene, theme: Theme): Promise<voi
   const images: [string, string][] = [];
   for (const [key, [w, h]] of Object.entries(SIZES)) {
     if (scene.textures.exists(key)) scene.textures.remove(key);
-    const src = sources[key] ?? DEFAULTS[key];
+    // hélice longue : reprend l'hélice du thème s'il en dessine une (étoile de mer de Plage)
+    const src = sources[key] ?? (key === 'spinnerLong' ? sources.spinner : null) ?? DEFAULTS[key];
     if (typeof src === 'string') {
       images.push([key, src]);
       continue;

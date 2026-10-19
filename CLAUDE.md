@@ -16,14 +16,17 @@ Aucun backend, aucun token Twitch.
 ## Commandes
 - `npm run dev` — serveur de dev (clic = bille du streamer, Échap = menu ; `/?debug=1` : touche B = bots, T = thème)
 - `npm run build` / `npm run preview` — build statique
-- `npm run test` — vitest (mapgen, réglages, état, bans, historique, top du mois, taquets spéciaux, parse IRC)
+- `npm run test` — vitest (mapgen dont mobiles, couloir et taquets à valeur, réglages, état, bans, historique, top du mois, taquets spéciaux, parse IRC)
 - `npm run verify` — vérification navigateur du mode streamer (Playwright sur le Chrome installé, dev server lancé)
 
 ## Git
 `main` = production : chaque push déploie sur GitHub Pages (`pages.yml`, tests puis build). Ne jamais y pousser directement.
-- Une branche courte par étape du PLAN (`feat/…`, `fix/…`, `ci/…`), créée depuis `main` à jour.
+`dev` = intégration : tout y est fusionné et testé par un humain avant de partir en production.
+- Une branche courte par étape du PLAN (`feat/…`, `fix/…`, `ci/…`), créée depuis `dev` à jour.
 - `npm run test` et `npm run verify` verts en local (verify ne tourne pas en CI : Chrome installé + Twitch en direct).
-- `gh pr create --fill`, attendre la CI (`ci.yml` : tests + build), puis `gh pr merge --squash --delete-branch`.
+- `gh pr create --fill --base dev`, attendre la CI (`ci.yml` : tests + build), puis `gh pr merge --squash --delete-branch`.
+- Mise en production : seulement après test humain de `dev` et accord explicite. PR `dev` → `main`, fusionnée
+  avec `gh pr merge --merge` (pas de squash : `dev` et `main` gardent la même histoire ; jamais `--delete-branch`).
 
 ## Architecture
 - `src/mapgen.ts` : génération procédurale **pure** (seed → éléments). Ne jamais importer Phaser ici.
@@ -36,6 +39,8 @@ Aucun backend, aucun token Twitch.
 - Taquets spéciaux : `src/game/specials.ts` (catalogue des effets + tirage, pur) et `src/scenes/specials.ts`
   (taquet allumé, effets, possédé par `Game` comme `Juice`). Spec :
   `docs/superpowers/specs/2026-10-11-timer-top-du-mois-taquets-speciaux-design.md`.
+- Bacs qui défilent : `src/scenes/bins.ts` ; billes d'animation (attente) : `src/scenes/attract.ts`. Possédés par `Game` comme
+  `Specials`. Spec : `docs/superpowers/specs/2026-10-19-mobiles-couloir-bacs-taquets-design.md`.
 - `src/twitch/` : `chat.ts` (IRC WebSocket anonyme), `heat.ts` (WebSocket Heat), `users.ts` (lookup + avatars).
 - Communication via `game.events` (Phaser EventEmitter), pas de bus maison.
 - `src/themes/` : thèmes visuels (spec : `docs/superpowers/specs/2026-10-02-themes-design.md`).

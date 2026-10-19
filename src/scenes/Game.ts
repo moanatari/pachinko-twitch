@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import {
-  params, BOARD_W, HEIGHT, WALL, BALL_R, PEG_R, MAX_SPEED, RAMP_THICK, SPINNER_ARM,
-  PTS_PEG, PTS_PEG_GOLDEN, PTS_BUMPER, PTS_SPINNER, HIT_COOLDOWN_MS, BUMPER_SPEED,
-  STUCK_NUDGE_MS, STUCK_KILL_MS, PODIUM_MS, BIG_WIN,
+  params, BOARD_W, HEIGHT, WALL, BALL_R, PEG_R, MAX_SPEED, RAMP_THICK, SPINNER_ARM, BAR_THICK, SPINNER_R,
+  PTS_PEG_GOLDEN, PTS_BUMPER, PTS_SPINNER, HIT_COOLDOWN_MS, BUMPER_SPEED,
+  STUCK_NUDGE_MS, STUCK_KILL_MS, PODIUM_MS, BIG_WIN, ATTRACT_ALPHA,
 } from '../config';
-import { generateMap, PATTERNS, type MapData, type PatternId } from '../mapgen';
-import { applyTheme } from '../themes/apply';
+import { BOARD_BOUNDS, generateMap, PATTERNS, type MapData, type Move, type PatternId, type PegValue } from '../mapgen';
+import { applyTheme, PEG_TEX } from '../themes/apply';
 import { resolveTheme, todayMMDD } from '../themes/resolve';
 import type { Theme } from '../themes/types';
 import { setupDebug } from '../debug';
@@ -23,6 +23,8 @@ import type { AdminAction } from '../twitch/chat';
 import { Juice, type Pulse } from './fx';
 import { ROWS } from './Hud';
 import { Specials } from './specials';
+import { Bins, type BinFace } from './bins';
+import { Attract } from './attract';
 
 type Body = MatterJS.BodyType;
 export type ModAction = 'removeBall' | 'resetScore' | 'ban' | 'unban';
@@ -36,19 +38,22 @@ export interface Ball {
   hits: Map<number, number>; // id d'obstacle → dernier score (cooldown)
   anchor: { x: number; y: number; t: number }; // dernière position « éloignée » (anti-blocage)
   lastNudge: number;
+  fake?: boolean; // bille d'animation : hors GameState, sans points
 }
 
 interface El {
   kind: 'peg' | 'bin' | 'bumper' | 'spinner';
+  half?: number; // barre bumper : demi-longueur (rebond)
   points: number;
   pulse: Pulse;
-  golden?: boolean;
   binX?: number; // centre du bac (pop-up)
 }
 
 interface SpinnerRt { body: Body; img: Phaser.GameObjects.Image; speed: number }
-/** Taquet non doré de la carte : candidat aux taquets spéciaux, repeint par la pluie d'or. */
-export interface PegRt { x: number; y: number; bodyId: number; img: Phaser.GameObjects.Image }
+/** Élément en aller-retour : corps et images déplacés ensemble. `pos` réutilisé : aucune allocation par pas. */
+interface MoverRt { body: Body; imgs: Phaser.GameObjects.Image[]; x: number; y: number; move: Move; t: number; pos: { x: number; y: number } }
+/** Taquet à moins de 10 points : repeint par la pluie d'or ; ceux à 1 point sont candidats aux taquets spéciaux. */
+export interface PegRt { x: number; y: number; bodyId: number; img: Phaser.GameObjects.Image; value: PegValue }
 
 const DIVIDER = 6;
 const hex = (c: string) => Phaser.Display.Color.HexStringToColor(c).color;
@@ -61,6 +66,7 @@ export class Game extends Phaser.Scene {
   private mapBodies: Body[] = [];
   private mapObjects: Phaser.GameObjects.GameObject[] = [];
   private spinners: SpinnerRt[] = [];
+  private movers: MoverRt[] = [];
   private toRemove: Ball[] = [];
   readonly state = new GameState(params.maxBalls, PODIUM_MS);
   private readonly kv = safeStorage();
@@ -77,6 +83,9 @@ export class Game extends Phaser.Scene {
   readonly pegs: PegRt[] = [];
   readonly fx = new Juice(this);
   private specials = new Specials(this);
+  readonly bins = new Bins(this);
+  private attract = new Attract(this);
+  private fakes = 0;
   private frame = 0; // traînées : une frame sur deux
   private queued = new Map<string, () => void>(); // commandes reçues pendant un chargement, rejouées ensuite
 
@@ -239,6 +248,7 @@ export class Game extends Phaser.Scene {
     this.map = undefined; // suspend update() pendant la transition
     for (const ball of [...this.balls.values()]) this.removeBall(ball);
     this.toRemove.length = 0;
+    this.attract.clear();
     this.specials.clear(); // avant clearMap : la pluie d'or repeint des images de taquets encore vivantes
     this.clearMap();
     const theme = resolveTheme(todayMMDD(params.date), this.forcedTheme ?? (params.theme === 'auto' ? null : params.theme));
@@ -256,7 +266,7 @@ export class Game extends Phaser.Scene {
       this.game.registry.set('theme', theme);
       this.game.events.emit('theme', theme);
     }
-    this.buildMap(generateMap(seed, pattern));
+    this.buildMap(generateMap(seed, pattern, BOARD_BOUNDS, { lane: params.lane }));
     this.state.start(Date.now(), params.duration * 60_000);
     this.recorded = false;
     this.warmMonthly();
@@ -270,6 +280,7 @@ export class Game extends Phaser.Scene {
     this.mapObjects = [];
     this.mapBodies = [];
     this.spinners = [];
+    this.movers = [];
     this.pegs.length = 0;
     this.els.clear();
   }
@@ -289,13 +300,11 @@ export class Game extends Phaser.Scene {
 
     for (const p of map.pegs) {
       const body = this.staticBody(this.matter.add.circle(p.x, p.y, PEG_R, { isStatic: true, label: 'peg' }));
-      if (p.golden) this.halo(p.x, p.y, PEG_R * 5, pal.pegGolden);
-      const img = this.track(this.add.image(p.x, p.y, p.golden ? 'pegGolden' : 'peg').setDisplaySize(PEG_R * 2, PEG_R * 2));
-      if (!p.golden) this.pegs.push({ x: p.x, y: p.y, bodyId: body.id, img });
-      this.els.set(body.id, {
-        kind: 'peg', points: p.golden ? PTS_PEG_GOLDEN : PTS_PEG, golden: p.golden,
-        pulse: { kind: 'peg', v: 0, img, size: PEG_R * 2 },
-      });
+      if (p.value >= 10)
+        this.halo(p.x, p.y, PEG_R * (p.value === 50 ? 9 : 5), p.value === 10 ? pal.pegGolden : p.value === 30 ? pal.bumperCore : pal.text);
+      const img = this.track(this.add.image(p.x, p.y, PEG_TEX[p.value]).setDisplaySize(PEG_R * 2, PEG_R * 2));
+      if (p.value < 10) this.pegs.push({ x: p.x, y: p.y, bodyId: body.id, img, value: p.value });
+      this.els.set(body.id, { kind: 'peg', points: p.value, pulse: { kind: 'peg', v: 0, img, size: PEG_R * 2 } });
     }
 
     for (const r of map.ramps) {
@@ -306,12 +315,26 @@ export class Game extends Phaser.Scene {
 
     for (const b of map.bumpers) {
       const body = this.staticBody(this.matter.add.circle(b.x, b.y, b.radius, { isStatic: true, label: 'bumper' }));
-      this.halo(b.x, b.y, b.radius * 3, pal.bumperCore);
+      const halo = this.halo(b.x, b.y, b.radius * 3, pal.bumperCore);
       const img = this.track(this.add.image(b.x, b.y, 'bumper').setDisplaySize(b.radius * 2, b.radius * 2));
       // cœur de l'ampoule qui s'allume au contact
       const glow = this.track(this.add.image(b.x, b.y, 'fx-glow').setDisplaySize(b.radius * 2.4, b.radius * 2.4)
         .setBlendMode('ADD').setTint(hex(pal.bumperCore)).setAlpha(0));
       this.els.set(body.id, { kind: 'bumper', points: PTS_BUMPER, pulse: { kind: 'bumper', v: 0, img, size: b.radius * 2, glow } });
+      this.mover(body, b, [halo, img, glow]);
+    }
+
+    for (const r of map.bars) {
+      const body = this.staticBody(this.matter.add.rectangle(r.x, r.y, r.length, BAR_THICK,
+        { isStatic: true, angle: r.angle, chamfer: { radius: BAR_THICK / 2 }, label: 'bumper' }));
+      const img = this.track(this.add.image(r.x, r.y, 'bar').setDisplaySize(r.length, BAR_THICK).setRotation(r.angle));
+      const glow = this.track(this.add.image(r.x, r.y, 'fx-glow').setDisplaySize(r.length * 1.1, BAR_THICK * 3)
+        .setRotation(r.angle).setBlendMode('ADD').setTint(hex(pal.bumperCore)).setAlpha(0));
+      this.els.set(body.id, {
+        kind: 'bumper', points: PTS_BUMPER, half: r.length / 2,
+        pulse: { kind: 'bumper', v: 0, img, size: r.length, h: BAR_THICK, glow },
+      });
+      this.mover(body, r, [img, glow]);
     }
 
     for (const s of map.spinners) {
@@ -321,47 +344,79 @@ export class Game extends Phaser.Scene {
       const body = this.matter.body.create({ parts, isStatic: true, label: 'spinner' });
       this.matter.world.add(body);
       this.staticBody(body);
-      const img = this.track(this.add.image(s.x, s.y, 'spinner').setDisplaySize(s.radius * 2, s.radius * 2));
+      const img = this.track(this.add.image(s.x, s.y, s.radius > SPINNER_R ? 'spinnerLong' : 'spinner').setDisplaySize(s.radius * 2, s.radius * 2));
       this.spinners.push({ body, img, speed: s.speed });
       this.els.set(body.id, { kind: 'spinner', points: PTS_SPINNER, pulse: { kind: 'spinner', v: 0, img } });
+      this.mover(body, s, [img]);
     }
 
-    const g = this.track(this.add.graphics());
     const binH = HEIGHT - map.binTop;
-    map.bins.forEach((bin, i) => {
-      g.fillStyle(hex(pal.bins[i % pal.bins.length]), 1).fillRect(bin.x, map.binTop, bin.width, binH);
+    // faces d'abord (fond, liseré, chiffre) : elles glissent sous les flashs et les séparateurs
+    const faces: BinFace[] = map.bins.map((bin, i) => {
+      const face = this.track(this.add.container(bin.x, map.binTop));
+      face.add(this.add.rectangle(0, 0, bin.width, binH, hex(pal.bins[i % pal.bins.length])).setOrigin(0));
+      if (bin.points >= BIG_WIN) {
+        // gros bacs : liseré rouge laqué + or
+        face.add(this.add.graphics()
+          .lineStyle(4, hex(pal.bumperCore), 1).strokeRect(5, 5, bin.width - 10, binH - 10)
+          .lineStyle(1, hex(pal.accent), 1).strokeRect(9, 9, bin.width - 18, binH - 18));
+      }
+      face.add(this.add.text(bin.width / 2, binH * 0.55, String(bin.points), {
+        fontFamily: this.theme.font.family, fontSize: '30px', color: pal.binHighlight,
+      }).setOrigin(0.5));
+      return { obj: face, points: bin.points };
+    });
+    const slots: El[] = map.bins.map((bin, i) => {
       const sensor = this.staticBody(this.matter.add.rectangle(
         bin.x + bin.width / 2, map.binTop + binH / 2 + BALL_R * 2, bin.width - DIVIDER, binH,
         { isStatic: true, isSensor: true, label: 'bin' }));
       const rect = this.track(this.add.rectangle(bin.x, map.binTop, bin.width, binH, hex(pal.binHighlight))
         .setOrigin(0).setBlendMode('ADD').setAlpha(0));
-      this.els.set(sensor.id, { kind: 'bin', points: bin.points, binX: bin.x + bin.width / 2, pulse: { kind: 'bin', v: 0, rect } });
-      if (bin.points >= BIG_WIN) {
-        // gros bacs : liseré rouge laqué + or
-        g.lineStyle(4, hex(pal.bumperCore), 1).strokeRect(bin.x + 5, map.binTop + 5, bin.width - 10, binH - 10);
-        g.lineStyle(1, hex(pal.accent), 1).strokeRect(bin.x + 9, map.binTop + 9, bin.width - 18, binH - 18);
-      }
-      this.track(this.add.text(bin.x + bin.width / 2, map.binTop + binH * 0.55, String(bin.points), {
-        fontFamily: this.theme.font.family, fontSize: '30px', color: pal.binHighlight,
-      }).setOrigin(0.5));
-      if (i > 0) {
-        this.staticBody(this.matter.add.rectangle(bin.x, map.binTop + binH / 2, DIVIDER, binH, { isStatic: true, label: 'wall' }));
-        g.fillStyle(hex(pal.frame), 1).fillRect(bin.x - DIVIDER / 2, map.binTop, DIVIDER, binH);
-      }
+      const el: El = { kind: 'bin', points: bin.points, binX: bin.x + bin.width / 2, pulse: { kind: 'bin', v: 0, rect } };
+      this.els.set(sensor.id, el);
+      if (i > 0) this.staticBody(this.matter.add.rectangle(bin.x, map.binTop + binH / 2, DIVIDER, binH, { isStatic: true, label: 'wall' }));
+      return el;
     });
+    const g = this.track(this.add.graphics());
+    for (const bin of map.bins.slice(1)) g.fillStyle(hex(pal.frame), 1).fillRect(bin.x - DIVIDER / 2, map.binTop, DIVIDER, binH);
     g.fillStyle(hex(pal.frame), 1).fillRect(WALL, map.binTop - 2, BOARD_W - WALL * 2, 3);
+    this.bins.attach(faces, slots, map.bins[0].x, map.bins[0].width);
 
     // taquet spécial : pastille + halo créés une fois par carte, déplacés et teintés à chaque apparition
     this.specials.attach(
       this.track(this.add.image(0, 0, 'pegSpecial').setDisplaySize(PEG_R * 2.6, PEG_R * 2.6).setVisible(false)),
       this.track(this.add.image(0, 0, 'fx-glow').setDisplaySize(PEG_R * 9, PEG_R * 9).setBlendMode('ADD').setDepth(-1).setVisible(false)),
     );
+
+    this.stepMovers(0, false); // position de départ selon la phase, sans élan
+    this.syncMovers();
   }
 
   /** Halo additif pulsant, posé SOUS l'élément. Remplace le glow PostFX (une passe de rendu par objet :
    *  −15 fps mesurés sur iGPU à 150 billes) ; une image additive reste dans le lot de rendu. */
   private halo(x: number, y: number, size: number, color: string) {
-    this.fx.addHalo(this.track(this.add.image(x, y, 'fx-glow').setDisplaySize(size, size).setBlendMode('ADD').setTint(hex(color))));
+    const img = this.track(this.add.image(x, y, 'fx-glow').setDisplaySize(size, size).setBlendMode('ADD').setTint(hex(color)));
+    this.fx.addHalo(img);
+    return img;
+  }
+
+  private mover(body: Body, e: { x: number; y: number; move?: Move }, imgs: Phaser.GameObjects.Image[]) {
+    if (e.move) this.movers.push({ body, imgs, x: e.x, y: e.y, move: e.move, t: 0, pos: { x: e.x, y: e.y } });
+  }
+
+  /** Aller-retour ralenti aux deux bouts. `carry` : setPosition met à jour la vitesse, la bille reçoit l'élan. */
+  private stepMovers(dt: number, carry = true) {
+    for (const m of this.movers) {
+      m.t += dt;
+      const k = (1 - Math.cos(2 * Math.PI * (m.t / m.move.periodMs + m.move.phase))) / 2;
+      m.pos.x = m.x + (m.move.x2 - m.x) * k;
+      m.pos.y = m.y + (m.move.y2 - m.y) * k;
+      this.matter.body.setPosition(m.body, m.pos, carry);
+    }
+  }
+
+  private syncMovers() {
+    for (const m of this.movers) for (const img of m.imgs) img.setPosition(m.body.position.x, m.body.position.y);
   }
 
   private staticBody(b: Body) { this.mapBodies.push(b); return b; }
@@ -378,20 +433,31 @@ export class Game extends Phaser.Scene {
 
   /** Lâche une bille en x (coordonnée plateau). La bille tombe tout de suite, l'avatar arrive après. */
   private drop(viewer: Viewer, x: number, y = BALL_R + 24): Ball {
+    const hasAvatar = this.textures.exists(avatarKey(viewer.id));
+    const key = hasAvatar ? avatarKey(viewer.id) : fallbackKey(this, viewer, this.theme.font.family, this.theme.palette.ballRim);
+    if (!hasAvatar) this.fetchIdentity(viewer);
+    const ball = this.spawn(viewer.id, x, y, key);
+    this.fx.label(viewer.name, ball.body.position);
+    return ball;
+  }
+
+  /** Bille d'animation (attente) : bille du thème, translucide, sans joueur ni étiquette. */
+  dropFake(x: number) {
+    this.fakes++;
+    this.spawn('', x, BALL_R + 24, 'ball', true).img.setAlpha(ATTRACT_ALPHA);
+  }
+
+  private spawn(userId: string, x: number, y: number, key: string, fake = false): Ball {
     const bx = Phaser.Math.Clamp(x, WALL + BALL_R + 2, BOARD_W - WALL - BALL_R - 2);
     const body = this.matter.add.circle(bx, y, BALL_R, {
       restitution: 0.5, friction: 0.001, frictionAir: 0.0008, label: 'ball',
     });
     this.matter.body.setVelocity(body, { x: Phaser.Math.FloatBetween(-0.6, 0.6), y: 0 });
-    const hasAvatar = this.textures.exists(avatarKey(viewer.id));
-    const key = hasAvatar ? avatarKey(viewer.id) : fallbackKey(this, viewer, this.theme.font.family, this.theme.palette.ballRim);
-    if (!hasAvatar) this.fetchIdentity(viewer);
     const img = this.add.image(bx, y, key).setDisplaySize(BALL_R * 2, BALL_R * 2);
     const ball: Ball = {
-      userId: viewer.id, body, img, done: false, hits: new Map(), anchor: { x: bx, y, t: this.time.now }, lastNudge: 0,
+      userId, body, img, done: false, hits: new Map(), anchor: { x: bx, y, t: this.time.now }, lastNudge: 0, fake,
     };
     this.balls.set(body.id, ball);
-    this.fx.label(viewer.name, body.position);
     return ball;
   }
 
@@ -427,7 +493,8 @@ export class Game extends Phaser.Scene {
       });
   }
 
-  get ballCount() { return this.balls.size; }
+  get ballCount() { return this.balls.size - this.fakes; }
+  get fakeCount() { return this.fakes; }
 
   private onCollision(e: Phaser.Physics.Matter.Events.CollisionStartEvent) {
     for (const pair of e.pairs) {
@@ -440,29 +507,37 @@ export class Game extends Phaser.Scene {
       const { x, y } = ball.body.position;
       if (el.kind === 'bin') {
         ball.done = true; // avant destruction : un 2e événement dans la même frame est ignoré
-        const pts = this.score(ball, el.points, x, y);
-        this.fx.bin(el.pulse, el.binX ?? x, this.map!.binTop, pts, el.points >= BIG_WIN);
+        if (ball.fake) this.fx.pulse(el.pulse); // bille d'animation : le bac s'allume, sans points
+        else {
+          const pts = this.score(ball, el.points, x, y);
+          this.fx.bin(el.pulse, el.binX ?? x, this.map!.binTop, pts, el.points >= BIG_WIN);
+        }
         this.toRemove.push(ball);
         continue;
       }
-      if (el.kind === 'bumper') this.bounce(ball, other);
-      else if (el.kind === 'peg') this.specials.hit(other.id, ball); // avant le cooldown : le 1er contact compte toujours
+      if (el.kind === 'bumper') this.bounce(ball, other, el.half);
+      else if (el.kind === 'peg' && !ball.fake) this.specials.hit(other.id, ball); // avant le cooldown : le 1er contact compte toujours
       const last = ball.hits.get(other.id) ?? -Infinity;
       if (this.time.now - last < HIT_COOLDOWN_MS) continue;
       ball.hits.set(other.id, this.time.now);
-      const gold = el.kind === 'peg' && this.specials.gold;
-      const pts = this.score(ball, gold ? PTS_PEG_GOLDEN : el.points, x, y);
-      this.fx.popup(x, y, pts);
-      if (el.kind === 'peg') this.fx.peg(el.pulse, x, y, !!el.golden || gold);
-      else if (el.kind === 'bumper') this.fx.bumper(el.pulse, x, y);
+      const base = el.kind === 'peg' && this.specials.gold ? Math.max(PTS_PEG_GOLDEN, el.points) : el.points;
+      const pts = ball.fake ? base : this.score(ball, base, x, y);
+      if (!ball.fake) this.fx.popup(x, y, pts);
+      if (el.kind === 'peg') this.fx.peg(el.pulse, x, y, pts);
+      else if (el.kind === 'bumper') this.fx.bumper(el.pulse, x, y, ball.fake);
       else this.fx.spinner(el.pulse, x, y);
     }
   }
 
-  /** Bumper : vitesse imposée le long de la normale, biaisée vers le haut. */
-  private bounce(ball: Ball, bumper: Body) {
-    let nx = ball.body.position.x - bumper.position.x;
-    let ny = ball.body.position.y - bumper.position.y - 0.6 * Math.hypot(nx, ball.body.position.y - bumper.position.y);
+  /** Bumper : vitesse imposée le long de la normale, biaisée vers le haut. Barre : la normale part du
+   *  point de la barre le plus proche de la bille (half = 0 : bumper rond). */
+  private bounce(ball: Ball, bumper: Body, half = 0) {
+    const c = Math.cos(bumper.angle), s = Math.sin(bumper.angle);
+    const { x, y } = ball.body.position;
+    const t = Phaser.Math.Clamp((x - bumper.position.x) * c + (y - bumper.position.y) * s, -half, half);
+    const cx = bumper.position.x + t * c, cy = bumper.position.y + t * s;
+    let nx = x - cx;
+    let ny = y - cy - 0.6 * Math.hypot(nx, y - cy);
     const len = Math.hypot(nx, ny) || 1;
     nx /= len;
     ny /= len;
@@ -496,11 +571,15 @@ export class Game extends Phaser.Scene {
     return pts;
   }
 
-  /** Seul chemin de fin de bille (bac, anti-blocage, reset) : libère toujours le viewer. */
-  private removeBall(ball: Ball) {
+  /** Seul chemin de fin de bille (bac, anti-blocage, reset, éclatement) : libère toujours le viewer. */
+  removeBall(ball: Ball) {
     if (!this.balls.delete(ball.body.id)) return;
     this.matter.world.remove(ball.body);
     ball.img.destroy();
+    if (ball.fake) {
+      this.fakes--;
+      return; // hors GameState
+    }
     this.state.ballFinished(ball.userId);
     this.game.events.emit('ballFinished', ball.userId);
   }
@@ -526,9 +605,11 @@ export class Game extends Phaser.Scene {
     for (let i = 0; i < 2; i++) {
       // setAngle(..., true) met à jour anglePrev : le solveur transmet l'élan du tourniquet
       for (const s of this.spinners) this.matter.body.setAngle(s.body, s.body.angle + (s.speed * dt) / 16.667, true);
+      this.stepMovers(dt);
       this.matter.world.step(dt);
     }
     for (const s of this.spinners) s.img.setRotation(s.body.angle);
+    this.syncMovers();
     const now = this.time.now;
     const trail = this.frame++ % 2 === 0;
     for (const ball of this.balls.values()) {
@@ -541,6 +622,8 @@ export class Game extends Phaser.Scene {
     }
     this.fx.update(delta);
     this.specials.update(delta);
+    this.bins.update(delta);
+    this.attract.update(delta);
     for (const ball of this.toRemove) this.removeBall(ball);
     this.toRemove.length = 0;
   }

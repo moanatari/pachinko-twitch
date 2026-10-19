@@ -22,6 +22,7 @@ export interface Pulse {
   v: number;
   img?: Phaser.GameObjects.Image;
   size?: number; // taille d'affichage au repos
+  h?: number; // hauteur d'affichage au repos (barre), sinon carré
   glow?: Phaser.GameObjects.Image; // halo additif (bumper)
   rect?: Phaser.GameObjects.Rectangle; // flash de bac
 }
@@ -133,26 +134,32 @@ export class Juice {
       .setTint(points >= 10 ? this.colors.accent : this.colors.text);
   }
 
-  peg(p: Pulse, x: number, y: number, golden: boolean) {
+  /** Étincelles proportionnelles aux points : dorées à partir de 10. */
+  peg(p: Pulse, x: number, y: number, points: number) {
     this.pulse(p);
-    if (golden) this.golden.explode(10, x, y);
-    else this.sparks.explode(4, x, y);
+    if (points >= 10) this.golden.explode(points >= 50 ? 28 : points >= 30 ? 18 : 10, x, y);
+    else this.sparks.explode(points >= 5 ? 7 : 4, x, y);
   }
 
-  bumper(p: Pulse, x: number, y: number) {
+  /** `quiet` : bille d'animation, juice sans secousse. */
+  bumper(p: Pulse, x: number, y: number, quiet = false) {
     this.pulse(p);
     this.bursts.explode(14, x, y);
     const r = this.rings[this.ri++ % RINGS];
     r.max = r.life = 380;
-    r.size = (p.size ?? 52) * 2.6;
-    r.img.setPosition(p.img!.x, p.img!.y).setTint(this.colors.core).setVisible(true);
-    this.shake(70, 0.0025);
+    // barre : petite onde au point de contact ; bumper rond : onde centrée sur l'ampoule
+    r.size = (p.h ? p.h * 4 : p.size ?? 52) * 2.6;
+    r.img.setPosition(p.h ? x : p.img!.x, p.h ? y : p.img!.y).setTint(this.colors.core).setVisible(true);
+    if (!quiet) this.shake(70, 0.0025);
   }
 
   spinner(p: Pulse, x: number, y: number) {
     this.pulse(p);
     this.sparks.explode(6, x, y);
   }
+
+  /** Bille d'animation qui éclate (fin de l'attente). */
+  pop(x: number, y: number) { this.bursts.explode(10, x, y); }
 
   bin(p: Pulse, x: number, y: number, points: number, big: boolean) {
     this.pulse(p);
@@ -215,7 +222,7 @@ export class Juice {
       const v = p.v;
       if (p.img && p.size) {
         const grow = p.kind === 'peg' ? 0.35 : p.kind === 'bumper' ? 0.15 : 0;
-        if (grow) p.img.setDisplaySize(p.size * (1 + grow * v), p.size * (1 + grow * v));
+        if (grow) p.img.setDisplaySize(p.size * (1 + grow * v), (p.h ?? p.size) * (1 + grow * v));
         if (p.kind === 'peg' || p.kind === 'spinner') {
           if (v > 0.5) p.img.setTintFill(0xffffff);
           else p.img.clearTint();

@@ -54,13 +54,13 @@ terminée et vérifiée.
 - [x] 16. Fin de partie nette + lien copiable des réglages
 - [x] 17. Réglages enregistrés automatiquement, croix de fermeture, lien OBS sans menu (`menu=0`)
 - [x] 18. Chaîne connectée par un bouton, état de la connexion affiché
-- [ ] 19. Taquets à valeur (1, 5, 10, 30, 50) (spec `docs/superpowers/specs/2026-10-19-mobiles-couloir-bacs-taquets-design.md`, plan `docs/superpowers/plans/2026-10-19-mobiles-couloir-bacs-taquets.md`)
-- [ ] 20. Barres bumpers et hélices longues (même spec, même plan)
-- [ ] 21. Éléments mobiles (même spec, même plan)
-- [ ] 22. Couloir du bas (même spec, même plan)
-- [ ] 23. Bacs qui défilent (même spec, même plan)
-- [ ] 24. Billes d'animation pendant l'attente (même spec, même plan)
-- [ ] 25. Réglages en sous-onglets, onglet « À propos », version automatique (même plan)
+- [x] 19. Taquets à valeur (1, 5, 10, 30, 50) (spec `docs/superpowers/specs/2026-10-19-mobiles-couloir-bacs-taquets-design.md`, plan `docs/superpowers/plans/2026-10-19-mobiles-couloir-bacs-taquets.md`)
+- [x] 20. Barres bumpers et hélices longues (même spec, même plan)
+- [x] 21. Éléments mobiles (même spec, même plan)
+- [x] 22. Couloir du bas (même spec, même plan)
+- [x] 23. Bacs qui défilent (même spec, même plan)
+- [x] 24. Billes d'animation pendant l'attente (même spec, même plan)
+- [x] 25. Réglages en sous-onglets, onglet « À propos », version automatique (même plan)
 
 ## Décisions prises
 | Sujet | Choix |
@@ -693,42 +693,50 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
 - [x] **Vérif** : `npm run test` et `npm run verify` verts.
 
 ### 19. Taquets à valeur
-- [ ] `Peg.value` (1, 5, 10, 30, 50) en nombres fixes par carte, un seul 50, 30 et 50 espacés, miroir en symétrique.
-- [ ] Textures `peg5`, `peg30`, `peg50` (le 10 garde `pegGolden`), halos, étincelles selon la valeur.
-- [ ] Taquets spéciaux sur les taquets à 1 point ; pluie d'or : au moins 10 points, chaque taquet retrouve sa texture.
+- [x] `Peg.value` (1, 5, 10, 30, 50) en nombres fixes par carte, un seul 50, 30 et 50 espacés, miroir en symétrique.
+- [x] Textures `peg5`, `peg30`, `peg50` (le 10 garde `pegGolden`), halos, étincelles selon la valeur.
+- [x] Taquets spéciaux sur les taquets à 1 point ; pluie d'or : au moins 10 points, chaque taquet retrouve sa texture.
 - ⚠️ La carte d'une seed change (tirages modifiés) : l'historique rejoue une carte différente pour les anciennes parties.
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps à `?debug=1&bots=150` ; chaque thème (touche T).
+- [x] **Vérif** : `npm run test` (246) et `npm run verify` verts, 158 fps headless à 150 billes.
+      À valider à l'œil sur `dev` : rendu des paliers dans chaque thème (touche T).
 
 ### 20. Barres bumpers et hélices longues
-- [ ] `Bar` (capsule, rebond perpendiculaire), une fois sur trois à la place d'un bumper dans les motifs.
-- [ ] Hélices longues (≈ 1 sur 3, plus lentes), texture `spinnerLong` (reprend l'hélice du thème s'il en dessine une).
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps.
+- [x] `Bar` (capsule, rebond perpendiculaire), une fois sur trois à la place d'un bumper dans les motifs.
+- [x] Hélices longues (≈ 1 sur 3, plus lentes), texture `spinnerLong` (reprend l'hélice du thème s'il en dessine une).
+- [x] **Vérif** : `npm run test` (248) et `npm run verify` verts, 158 fps headless à 150 billes.
+      À valider à l'œil sur `dev` : rebond sur une barre, bras fins des hélices longues, étoile de mer du thème Plage.
 
 ### 21. Éléments mobiles
-- [ ] `move` sur bumpers, barres, hélices ; capsule balayée dans les règles ; 2 à 4 mobiles posés avant les taquets.
-- [ ] Corps déplacés à chaque sous-pas (`setPosition(…, true)`), figés en pause.
+- [x] `move` sur bumpers, barres, hélices ; capsule balayée dans les règles ; 2 à 4 mobiles posés avant les taquets.
+- [x] Corps déplacés à chaque sous-pas (`setPosition(…, true)`), figés en pause.
 - ⚠️ Une barre mobile glisse dans son axe (sinon la zone balayée n'est plus une capsule).
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps ; aucune bille coincée par un mobile.
+- [x] **Vérif** : `npm run test` (251) et `npm run verify` verts, jusqu'à 158 fps headless à 150 billes (comme l'étape 20).
+      À valider à l'œil sur `dev` : aucune bille coincée par un mobile, reprise après pause sans saut.
 
 ### 22. Couloir du bas
-- [ ] Réglage `lane` (menu + URL `lane=0`, carte suivante).
-- [ ] Un élément de mur à mur au-dessus des bacs, deux en miroir en symétrique ; passage ≥ `MIN_GAP` aux bouts.
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps.
+- [x] Réglage `lane` (menu + URL `lane=0`, carte suivante).
+- [x] Un élément de mur à mur au-dessus des bacs, deux en miroir en symétrique ; passage ≥ `MIN_GAP` aux bouts.
+- ⚠️ « Rejouer cette carte » suit le réglage `lane` courant (l'historique ne garde que seed + motif).
+- [x] **Vérif** : `npm run test` (259) et `npm run verify` verts, 158 fps headless à 150 billes.
+      À valider à l'œil sur `dev` : balayage mur à mur, deux éléments en miroir en symétrique, case décochée.
 
 ### 23. Bacs qui défilent
-- [ ] Réglage `binScroll` (désactivé / 30 s / 1 min, URL 0–300) ; `binShifts` (jackpot jamais au bord).
-- [ ] `src/scenes/bins.ts` : glissement animé, valeurs payées tout de suite, figé en pause et au podium.
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts (défilement, pause, `binScroll=45` conservé).
+- [x] Réglage `binScroll` (désactivé / 30 s / 1 min, URL 0–300) ; `binShifts` (jackpot jamais au bord).
+- [x] `src/scenes/bins.ts` : glissement animé, valeurs payées tout de suite, figé en pause et au podium.
+- [x] **Vérif** : `npm run test` (265) et `npm run verify` verts (défilement, pause, `binScroll=45` conservé), 158 fps headless.
+      À valider à l'œil sur `dev` : glissement de la bande et fondu aux bords.
 
 ### 24. Billes d'animation
-- [ ] Réglage `attract` ; `src/scenes/attract.ts` : billes hors `GameState` pendant l'attente, figées puis éclatées à la première vraie bille.
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts (classement vide, plafond, changement de thème) ; 60 fps.
+- [x] Réglage `attract` ; `src/scenes/attract.ts` : billes hors `GameState` pendant l'attente, figées puis éclatées à la première vraie bille.
+- [x] **Vérif** : `npm run test` (268) et `npm run verify` verts (classement vide, plafond, changement de thème) ; 158 fps headless.
+      À valider à l'œil sur `dev` : chute des billes d'animation, gel puis éclatement à la première vraie bille.
 
 ### 25. Réglages en sous-onglets, « À propos », version automatique
-- [ ] Version `majeur.mineur.<nombre de commits>` + commit + date, injectée au build (`vite.config.ts`, `__BUILD__`) ; `pages.yml` en `fetch-depth: 0`.
-- [ ] Réglages : sous-onglets Chaîne · Partie · Effets · Exclus (bascule de visibilité, enregistrement auto inchangé).
-- [ ] Onglet « À propos » : version, langages, technos et versions installées, lien vers le dépôt GitHub.
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; version visible sur la GitHub Page après déploiement.
+- [x] Version `majeur.mineur.<nombre de commits>` + commit + date, injectée au build (`vite.config.ts`, `__BUILD__`) ; `pages.yml` en `fetch-depth: 0`.
+- [x] Réglages : sous-onglets Chaîne · Partie · Effets · Exclus (bascule de visibilité, enregistrement auto inchangé).
+- [x] Onglet « À propos » : version, langages, technos et versions installées, lien vers le dépôt GitHub.
+- [x] **Vérif** : `npm run test` (268) et `npm run verify` verts ; version `v0.1.53` dans le bundle.
+- [ ] Après la mise en production : « À propos » de la GitHub Page affiche la version sans « (dev) », dernier chiffre = nombre de commits de `main`.
 
 ## Vérification
 - `npm run test` : `mapgen.test.ts` (1000 seeds × 5 patterns respectent les règles),

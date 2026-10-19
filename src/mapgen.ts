@@ -2,7 +2,9 @@
 import { Rng } from './rng';
 import {
   BOARD_W, HEIGHT, WALL, PEG_R, BUMPER_R, SPINNER_R, RAMP_THICK,
-  SPAWN_ZONE, BIN_H, BIN_CLEAR, MIN_GAP, SPINNER_SPEED,
+  BAR_THICK, BAR_LEN_MIN, BAR_LEN_MAX, BAR_SHARE, SPINNER_R_LONG, SPINNER_LONG_SHARE, SPINNER_LONG_SPEED,
+  SPAWN_ZONE, BIN_H, BIN_CLEAR, MIN_GAP, SPINNER_SPEED, PEG_VALUES, PEG_SHARE, RARE_PEG_SPACING,
+  MOVERS_MIN, MOVERS_MAX, MOVE_LEN_MIN, MOVE_LEN_MAX, MOVE_PERIOD_MIN, MOVE_PERIOD_MAX, LANE_BAR_LEN, LANE_PERIOD_MS,
 } from './config';
 
 export const PATTERNS = ['classique', 'symetrique', 'diagonale', 'trous', 'entonnoirs'] as const;
@@ -11,10 +13,13 @@ export type PatternId = (typeof PATTERNS)[number];
 export interface Bounds { left: number; right: number; top: number; bottom: number }
 export const BOARD_BOUNDS: Bounds = { left: WALL, right: BOARD_W - WALL, top: 0, bottom: HEIGHT };
 
-export interface Peg { x: number; y: number; golden: boolean }
+export type PegValue = (typeof PEG_VALUES)[number];
+export interface Peg { x: number; y: number; value: PegValue } // valeur tirée après la pose (pegValues)
 export interface Ramp { x: number; y: number; length: number; angle: number } // centre, angle en rad
-export interface Spinner { x: number; y: number; radius: number; speed: number } // speed en rad/step, signe = sens
-export interface Bumper { x: number; y: number; radius: number }
+export interface Move { x2: number; y2: number; periodMs: number; phase: number } // aller-retour (x,y) ↔ (x2,y2), phase ∈ [0, 1)
+export interface Bar { x: number; y: number; length: number; angle: number; move?: Move } // mobile : glisse dans son axe
+export interface Spinner { x: number; y: number; radius: number; speed: number; move?: Move } // speed en rad/step, signe = sens
+export interface Bumper { x: number; y: number; radius: number; move?: Move }
 export interface Bin { x: number; width: number; points: number } // x = bord gauche
 export interface MapData {
   seed: number;
@@ -23,8 +28,10 @@ export interface MapData {
   ramps: Ramp[];
   spinners: Spinner[];
   bumpers: Bumper[];
+  bars: Bar[];
   bins: Bin[];
   binTop: number;
+  laneTop?: number; // haut de l'élément du couloir du bas, absent = pas de couloir
 }
 
 export const RAMP_MIN_ANGLE = 0.25; // rad : en dessous, la bille s'arrête sur la rampe
@@ -33,9 +40,25 @@ export const RAMP_MIN_ANGLE = 0.25; // rad : en dessous, la bille s'arrête sur 
 interface Shape { x1: number; y1: number; x2: number; y2: number; r: number; name: string }
 
 const circle = (x: number, y: number, r: number, name: string): Shape => ({ x1: x, y1: y, x2: x, y2: y, r, name });
-const rampShape = (p: Ramp): Shape => {
-  const dx = (Math.cos(p.angle) * p.length) / 2, dy = (Math.sin(p.angle) * p.length) / 2;
-  return { x1: p.x - dx, y1: p.y - dy, x2: p.x + dx, y2: p.y + dy, r: RAMP_THICK / 2, name: 'rampe' };
+const segment = (x: number, y: number, length: number, angle: number, r: number, name: string): Shape => {
+  const dx = (Math.cos(angle) * length) / 2, dy = (Math.sin(angle) * length) / 2;
+  return { x1: x - dx, y1: y - dy, x2: x + dx, y2: y + dy, r, name };
+};
+const rampShape = (p: Ramp) => segment(p.x, p.y, p.length, p.angle, RAMP_THICK / 2, 'rampe');
+/** Cercle immobile, ou capsule balayée sur tout son trajet s'il est mobile. */
+const sweep = (p: { x: number; y: number; move?: Move }, r: number, name: string): Shape =>
+  ({ x1: p.x, y1: p.y, x2: p.move?.x2 ?? p.x, y2: p.move?.y2 ?? p.y, r, name });
+
+/** Barre : segment. Mobile, elle glisse dans son axe : la zone balayée reste un segment, du bout le plus
+ *  en arrière de la position de départ au bout le plus en avant de la position d'arrivée. */
+const barShape = (p: Bar): Shape => {
+  const s = segment(p.x, p.y, p.length, p.angle, BAR_THICK / 2, 'barre');
+  if (!p.move) return s;
+  const e = segment(p.move.x2, p.move.y2, p.length, p.angle, BAR_THICK / 2, 'barre');
+  const c = Math.cos(p.angle), sn = Math.sin(p.angle);
+  const pts = [[s.x1, s.y1], [s.x2, s.y2], [e.x1, e.y1], [e.x2, e.y2]]
+    .sort((a, b) => a[0] * c + a[1] * sn - (b[0] * c + b[1] * sn));
+  return { x1: pts[0][0], y1: pts[0][1], x2: pts[3][0], y2: pts[3][1], r: BAR_THICK / 2, name: 'barre' };
 };
 
 function pointSeg(px: number, py: number, s: Shape): number {
@@ -86,9 +109,10 @@ function tooClose(a: Shape, b: Shape): boolean {
 function shapesOf(m: MapData): Shape[] {
   return [
     ...m.pegs.map((p) => circle(p.x, p.y, PEG_R, 'taquet')),
-    ...m.bumpers.map((p) => circle(p.x, p.y, p.radius, 'bumper')),
-    ...m.spinners.map((p) => circle(p.x, p.y, p.radius, 'tourniquet')), // rayon de balayage complet
+    ...m.bumpers.map((p) => sweep(p, p.radius, 'bumper')),
+    ...m.spinners.map((p) => sweep(p, p.radius, 'tourniquet')), // rayon de balayage complet
     ...m.ramps.map(rampShape),
+    ...m.bars.map(barShape),
   ];
 }
 
@@ -105,6 +129,9 @@ export function validateMap(m: MapData, b: Bounds = BOARD_BOUNDS): string[] {
       if (tooClose(shapes[i], shapes[j]))
         errors.push(`écart ${gap(shapes[i], shapes[j]).toFixed(1)} < ${MIN_GAP} entre ${shapes[i].name} et ${shapes[j].name}`);
   for (const r of m.ramps) if (Math.abs(r.angle) < RAMP_MIN_ANGLE) errors.push('rampe trop plate');
+  for (const r of m.bars)
+    if (r.move && Math.abs(Math.sin(Math.atan2(r.move.y2 - r.y, r.move.x2 - r.x) - r.angle)) > 1e-6)
+      errors.push('barre mobile hors de son axe');
 
   if (m.bins.length < 5) errors.push('moins de 5 bacs');
   let x = b.left;
@@ -122,20 +149,28 @@ type Spec =
   | ({ kind: 'peg' } & Peg)
   | ({ kind: 'bumper' } & Bumper)
   | ({ kind: 'spinner' } & Spinner)
+  | ({ kind: 'bar' } & Bar)
   | ({ kind: 'ramp' } & Ramp);
 
 const shapeOf = (s: Spec): Shape =>
   s.kind === 'peg' ? circle(s.x, s.y, PEG_R, 'taquet')
-    : s.kind === 'bumper' ? circle(s.x, s.y, s.radius, 'bumper')
-    : s.kind === 'spinner' ? circle(s.x, s.y, s.radius, 'tourniquet') // rayon de balayage complet
+    : s.kind === 'bumper' ? sweep(s, s.radius, 'bumper')
+    : s.kind === 'spinner' ? sweep(s, s.radius, 'tourniquet') // rayon de balayage complet
+    : s.kind === 'bar' ? barShape(s)
     : rampShape(s);
 
 class Builder {
   readonly shapes: Shape[] = [];
   constructor(readonly m: MapData, readonly b: Bounds, readonly rng: Rng) {}
 
+  private deferred: Spec[][] | null = null; // taquets du motif, posés après les mobiles
+
   /** Pose tous les éléments, ou aucun si l'un d'eux viole une règle (paires symétriques). */
   place(specs: Spec[]): boolean {
+    if (this.deferred && specs.every((s) => s.kind === 'peg')) {
+      this.deferred.push(specs);
+      return true;
+    }
     const shapes = specs.map(shapeOf);
     for (const [i, s] of shapes.entries()) {
       if (placementError(s, this.b, this.m.binTop)) return false;
@@ -151,28 +186,52 @@ class Builder {
       if (kind === 'peg') this.m.pegs.push(e as Peg);
       else if (kind === 'bumper') this.m.bumpers.push(e as Bumper);
       else if (kind === 'spinner') this.m.spinners.push(e as Spinner);
+      else if (kind === 'bar') this.m.bars.push(e as Bar);
       else this.m.ramps.push(e as Ramp);
     }
     return true;
   }
 
-  peg(x: number, y: number, golden = this.rng.chance(0.03)) { return this.place([{ kind: 'peg', x, y, golden }]); }
+  /** Le motif pose sa structure maintenant ; ses taquets attendent `flushPegs` (les mobiles passent avant eux). */
+  deferPegs() { this.deferred = []; }
+
+  flushPegs() {
+    const specs = this.deferred ?? [];
+    this.deferred = null;
+    for (const s of specs) this.place(s);
+  }
+
+  peg(x: number, y: number) { return this.place([{ kind: 'peg', x, y, value: 1 }]); }
   bumper(x: number, y: number, radius = BUMPER_R) { return this.place([{ kind: 'bumper', x, y, radius }]); }
-  spinner(x: number, y: number, radius = SPINNER_R) {
-    return this.place([{ kind: 'spinner', x, y, radius, speed: this.spinnerSpeed() }]);
+  spinner(x: number, y: number, radius = this.spinnerRadius()) {
+    return this.place([{ kind: 'spinner', x, y, radius, speed: this.spinnerSpeed(radius) }]);
   }
   ramp(x: number, y: number, length: number, angle: number) { return this.place([{ kind: 'ramp', x, y, length, angle }]); }
 
-  spinnerSpeed() { return this.rng.pick([-1, 1]) * SPINNER_SPEED * this.rng.range(0.7, 1.3); }
+  spinnerRadius() { return this.rng.chance(SPINNER_LONG_SHARE) ? SPINNER_R_LONG : SPINNER_R; }
+
+  spinnerSpeed(radius = SPINNER_R) {
+    return this.rng.pick([-1, 1]) * SPINNER_SPEED * this.rng.range(0.7, 1.3) * (radius > SPINNER_R ? SPINNER_LONG_SPEED : 1);
+  }
+
+  /** Bumper rond ou, une fois sur trois, barre bumper. */
+  bumperSpec(x: number, y: number): Spec {
+    return this.rng.chance(BAR_SHARE)
+      ? { kind: 'bar', x, y, length: this.rng.range(BAR_LEN_MIN, BAR_LEN_MAX), angle: this.rng.range(-0.6, 0.6) }
+      : { kind: 'bumper', x, y, radius: BUMPER_R };
+  }
 
   get cx() { return (this.b.left + this.b.right) / 2; }
 
-  /** Image miroir par rapport à l'axe vertical central (rampes et tourniquets inversés). */
+  /** Image miroir par rapport à l'axe vertical central (rampes, barres, tourniquets et trajets inversés). */
   mirror(s: Spec): Spec {
-    const x = this.b.left + this.b.right - s.x;
-    if (s.kind === 'ramp') return { ...s, x, angle: -s.angle };
-    if (s.kind === 'spinner') return { ...s, x, speed: -s.speed };
-    return { ...s, x };
+    const mx = (x: number) => this.b.left + this.b.right - x;
+    if (s.kind === 'ramp') return { ...s, x: mx(s.x), angle: -s.angle };
+    if (s.kind === 'peg') return { ...s, x: mx(s.x) };
+    const mv = s.move && { move: { ...s.move, x2: mx(s.move.x2) } };
+    if (s.kind === 'spinner') return { ...s, ...mv, x: mx(s.x), speed: -s.speed };
+    if (s.kind === 'bar') return { ...s, ...mv, x: mx(s.x), angle: -s.angle };
+    return { ...s, ...mv, x: mx(s.x) };
   }
 
   /** Pose l'élément et son miroir ; sur l'axe central, un seul élément (pas de doublon superposé). */
@@ -182,7 +241,7 @@ class Builder {
 
   /** Zone jouable verticale (hors spawn et bande des bacs). */
   get playTop() { return this.b.top + SPAWN_ZONE; }
-  get playBottom() { return this.m.binTop - BIN_CLEAR; }
+  get playBottom() { return this.m.laneTop !== undefined ? this.m.laneTop - MIN_GAP : this.m.binTop - BIN_CLEAR; }
 }
 
 /** Valeurs tirées à chaque carte : un seul jackpot (500), jamais sur un bord ; bords toujours bas.
@@ -203,11 +262,34 @@ function makeBins(rng: Rng, b: Bounds, symmetric: boolean): Bin[] {
   return pts.map((points, i) => ({ x: b.left + i * width, width, points }));
 }
 
+/** Décalages k de la bande des valeurs (valeur i → bac (i + k) % n) qui gardent le jackpot loin des bords. Contient 0. */
+export function binShifts(points: readonly number[]): number[] {
+  const n = points.length, j = points.indexOf(Math.max(...points));
+  return Array.from({ length: n }, (_, k) => k).filter((k) => (j + k) % n !== 0 && (j + k) % n !== n - 1);
+}
+
+/** Couloir du bas : un élément en aller-retour de mur à mur juste au-dessus de la bande des bacs (deux en
+ *  miroir en symétrique, un par moitié). La zone de jeu remonte au-dessus de lui. */
+function lane(g: Builder, symmetric: boolean) {
+  const { rng, b } = g;
+  const kind = rng.pick(['bumper', 'bar', 'spinner'] as const);
+  const r = kind === 'bumper' ? BUMPER_R : kind === 'bar' ? BAR_THICK / 2 : g.spinnerRadius(); // demi-hauteur
+  const half = kind === 'bar' ? LANE_BAR_LEN / 2 + r : r; // demi-largeur, bouts arrondis compris
+  const y = g.m.binTop - BIN_CLEAR - r - 1;
+  const x = b.left + MIN_GAP + half + 1;
+  const x2 = (symmetric ? g.cx - MIN_GAP / 2 : b.right - MIN_GAP) - half - 1;
+  const move: Move = { x2, y2: y, periodMs: LANE_PERIOD_MS, phase: rng.next() };
+  const spec: Spec = kind === 'bumper' ? { kind, x, y, radius: r, move }
+    : kind === 'bar' ? { kind, x, y, length: LANE_BAR_LEN, angle: 0, move }
+      : { kind, x, y, radius: r, speed: g.spinnerSpeed(r), move };
+  if (symmetric ? g.place([spec, g.mirror(spec)]) : g.place([spec])) g.m.laneTop = y - r;
+}
+
 /** Déflecteurs collés aux murs, en quinconce : pas de couloir libre le long des bords. */
 function wallGuides(g: Builder, symmetric: boolean) {
   const r = RAMP_THICK / 2;
   for (const side of symmetric ? ['left'] : ['left', 'right']) {
-    for (let y = g.playTop + (side === 'left' ? 50 : 140); y < g.playBottom - 90; y += g.rng.range(170, 210)) {
+    for (let y = g.playTop + (side === 'left' ? 50 : 140); y < g.playBottom - 40; y += g.rng.range(170, 210)) {
       const L = g.rng.range(55, 80), a = g.rng.range(0.5, 0.7);
       const dx = (Math.cos(a) * L) / 2, dy = (Math.sin(a) * L) / 2;
       const spec: Spec = side === 'left'
@@ -253,7 +335,7 @@ function ensureBumpers(g: Builder, n: number) {
 function classique(g: Builder) {
   const holes = carveHoles(g, g.rng.int(2, 4), 90, 140);
   for (const h of holes) {
-    if (g.rng.chance(0.7)) g.bumper(h.x, h.y);
+    if (g.rng.chance(0.7)) g.place([g.bumperSpec(h.x, h.y)]);
     else g.spinner(h.x, h.y);
   }
   ensureBumpers(g, 2);
@@ -272,8 +354,11 @@ function symetrique(g: Builder) {
     if (holes.every((o) => Math.hypot(o.x - h.x, o.y - h.y) > o.r + h.r)) holes.push(h);
   }
   for (const h of holes) {
-    if (rng.chance(0.6)) g.sym({ kind: 'bumper', x: h.x, y: h.y, radius: BUMPER_R });
-    else g.sym({ kind: 'spinner', x: h.x, y: h.y, radius: SPINNER_R, speed: g.spinnerSpeed() });
+    if (rng.chance(0.6)) g.sym(g.bumperSpec(h.x, h.y));
+    else {
+      const radius = g.spinnerRadius();
+      g.sym({ kind: 'spinner', x: h.x, y: h.y, radius, speed: g.spinnerSpeed(radius) });
+    }
   }
   if (rng.chance(0.6)) {
     // paire de rampes en chevron, symétrique
@@ -285,7 +370,7 @@ function symetrique(g: Builder) {
   for (let row = 0, y = g.playTop + PEG_R + 12; y < g.playBottom - PEG_R; y += dy, row++) {
     for (let x = cx - (row % 2) * (dx / 2); x > g.b.left + MIN_GAP + PEG_R; x -= dx) {
       const px = x + (Math.abs(x - cx) < 1 ? 0 : rng.range(-4, 4)), py = y + rng.range(-4, 4);
-      if (!mirrored.some((h) => inHole(h, px, py))) g.sym({ kind: 'peg', x: px, y: py, golden: rng.chance(0.03) });
+      if (!mirrored.some((h) => inHole(h, px, py))) g.sym({ kind: 'peg', x: px, y: py, value: 1 });
     }
   }
 }
@@ -319,7 +404,7 @@ function diagonale(g: Builder) {
 function trous(g: Builder) {
   const holes = carveHoles(g, g.rng.int(3, 6), 80, 130, true);
   for (const h of holes) {
-    if (g.rng.chance(0.5)) g.bumper(h.x, h.y);
+    if (g.rng.chance(0.5)) g.place([g.bumperSpec(h.x, h.y)]);
     else g.spinner(h.x, h.y);
   }
   ensureBumpers(g, 2);
@@ -336,30 +421,98 @@ function entonnoirs(g: Builder) {
     const count = level === 0 ? rng.int(1, 2) : rng.int(1, 2);
     for (let k = 0; k < count; k++) {
       const fx = g.b.left + ((k + 0.5) / count) * (g.b.right - g.b.left) + rng.range(-60, 60);
+      const radius = g.spinnerRadius();
       const L = rng.range(150, 210), a = rng.range(0.42, 0.6);
       const dx = (L / 2) * Math.cos(a), dy = (L / 2) * Math.sin(a);
       const ok = g.place([
         { kind: 'ramp', x: fx - gap / 2 - dx, y: yb - dy, length: L, angle: a },
         { kind: 'ramp', x: fx + gap / 2 + dx, y: yb - dy, length: L, angle: -a },
       ]);
-      if (ok) g.spinner(fx, yb + SPINNER_R + MIN_GAP + 12);
+      if (ok) g.spinner(fx, yb + radius + MIN_GAP + 12, radius);
     }
   });
-  if (!g.m.spinners.length) g.spinner(g.cx, g.playTop + H * 0.4);
+  if (!g.m.spinners.length) g.spinner(g.cx, g.playTop + H * 0.4, SPINNER_R);
   ensureBumpers(g, 2);
   pegGrid(g, rng.range(72, 88), rng.range(60, 72));
 }
 
+/** Bumpers, barres et hélices en aller-retour, posés après la structure du motif et avant ses taquets :
+ *  tout leur trajet est interdit aux taquets. En symétrique, paires miroir hors de l'axe. */
+function movers(g: Builder, symmetric: boolean) {
+  const { rng, b } = g;
+  const want = symmetric ? 2 * rng.int(MOVERS_MIN / 2, MOVERS_MAX / 2) : rng.int(MOVERS_MIN, MOVERS_MAX);
+  for (let tries = 0, placed = 0; placed < want && tries < 600; tries++) {
+    const len = rng.range(MOVE_LEN_MIN, MOVE_LEN_MAX);
+    const a = rng.chance(0.75) ? rng.range(-0.3, 0.3) : rng.range(-1.2, 1.2); // surtout horizontal
+    const x = rng.range(b.left, symmetric ? g.cx : b.right), y = rng.range(g.playTop, g.playBottom);
+    const move: Move = {
+      x2: x + Math.cos(a) * len, y2: y + Math.sin(a) * len,
+      periodMs: rng.range(MOVE_PERIOD_MIN, MOVE_PERIOD_MAX), phase: rng.next(),
+    };
+    const kind = rng.pick(['bumper', 'bar', 'spinner'] as const);
+    const radius = kind === 'spinner' ? g.spinnerRadius() : BUMPER_R;
+    const spec: Spec = kind === 'bumper' ? { kind, x, y, radius, move }
+      : kind === 'bar' ? { kind, x, y, length: rng.range(BAR_LEN_MIN, BAR_LEN_MAX), angle: a, move } // glisse dans son axe
+        : { kind, x, y, radius, speed: g.spinnerSpeed(radius), move };
+    if (symmetric ? g.place([spec, g.mirror(spec)]) : g.place([spec])) placed += symmetric ? 2 : 1;
+  }
+}
+
+/** Valeurs tirées après la pose, en nombres fixes : un seul 50 par carte, taquets à 30 et 50 espacés.
+ *  En symétrique, on tire des « unités » (taquet de l'axe ou paire miroir) : les valeurs restent en miroir. */
+function pegValues(g: Builder, symmetric: boolean) {
+  const { m, rng } = g;
+  const near = (a: number, c: number) => Math.abs(a - c) < 0.5;
+  const mx = (x: number) => g.b.left + g.b.right - x;
+  const units: Peg[][] = symmetric
+    ? m.pegs.filter((p) => p.x < g.cx + 0.5).flatMap((p) => {
+      if (near(p.x, g.cx)) return [[p]];
+      const q = m.pegs.find((o) => near(o.x, mx(p.x)) && near(o.y, p.y));
+      return q ? [[p, q]] : [];
+    })
+    : m.pegs.map((p) => [p]);
+  // axe vide (bumper central, trous) : un taquet posé sur l'axe pour porter le 50
+  for (let tries = 0; symmetric && !units.some((u) => u.length === 1) && tries < 60; tries++)
+    if (g.place([{ kind: 'peg', x: g.cx, y: rng.range(g.playTop, g.playBottom), value: 1 }])) units.push([m.pegs[m.pegs.length - 1]]);
+  for (let i = units.length - 1; i > 0; i--) {
+    const j = rng.int(0, i);
+    [units[i], units[j]] = [units[j], units[i]];
+  }
+  const rare: Peg[] = [];
+  const spaced = (u: Peg[]) => u.every((p) =>
+    [...rare, ...u].every((q) => q === p || Math.hypot(p.x - q.x, p.y - q.y) >= RARE_PEG_SPACING));
+  const take = (value: PegValue, count: number, ok: (u: Peg[]) => boolean) => {
+    for (let i = 0, n = 0; i < units.length && n < count; i++) {
+      const u = units[i];
+      if (u[0].value !== 1 || !ok(u)) continue;
+      for (const p of u) p.value = value;
+      n += u.length;
+      if (value >= 30) rare.push(...u);
+    }
+  };
+  const n = m.pegs.length;
+  take(50, 1, (u) => u.length === 1);
+  take(30, Math.max(1, Math.round(n * PEG_SHARE[30])), spaced);
+  take(10, Math.round(n * PEG_SHARE[10]), () => true);
+  take(5, Math.round(n * PEG_SHARE[5]), () => true);
+}
+
 const GENERATORS: Record<PatternId, (g: Builder) => void> = { classique, symetrique, diagonale, trous, entonnoirs };
 
-export function generateMap(seed: number, pattern?: PatternId, b: Bounds = BOARD_BOUNDS): MapData {
+export function generateMap(seed: number, pattern?: PatternId, b: Bounds = BOARD_BOUNDS, opts: { lane?: boolean } = {}): MapData {
   const rng = new Rng(seed);
   const p = pattern ?? rng.pick(PATTERNS);
   const m: MapData = {
-    seed, pattern: p, pegs: [], ramps: [], spinners: [], bumpers: [], bins: makeBins(rng, b, p === 'symetrique'), binTop: b.bottom - BIN_H,
+    seed, pattern: p, pegs: [], ramps: [], spinners: [], bumpers: [], bars: [], bins: makeBins(rng, b, p === 'symetrique'), binTop: b.bottom - BIN_H,
   };
   const g = new Builder(m, b, rng);
-  wallGuides(g, p === 'symetrique');
+  const symmetric = p === 'symetrique';
+  if (opts.lane ?? true) lane(g, symmetric);
+  wallGuides(g, symmetric);
+  g.deferPegs();
   GENERATORS[p](g);
+  movers(g, symmetric);
+  g.flushPegs();
+  pegValues(g, symmetric);
   return m;
 }

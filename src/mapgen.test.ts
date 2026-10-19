@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { generateMap, validateMap, BOARD_BOUNDS, PATTERNS, type MapData } from './mapgen';
-import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK } from './config';
+import { generateMap, binShifts, validateMap, BOARD_BOUNDS, PATTERNS, type MapData, type Move } from './mapgen';
+import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK, BAR_THICK, SPINNER_R_LONG, PEG_SHARE, RARE_PEG_SPACING, MOVERS_MIN, MOVERS_MAX, MOVE_LEN_MIN, MOVE_LEN_MAX, MIN_GAP, LANE_PERIOD_MS } from './config';
 
 const b = BOARD_BOUNDS;
 const binTop = b.bottom - BIN_H;
@@ -8,7 +8,7 @@ const bins = Array.from({ length: 7 }, (_, i) => ({
   x: b.left + (i * (b.right - b.left)) / 7, width: (b.right - b.left) / 7, points: 10,
 }));
 const empty = (): MapData => ({
-  seed: 0, pattern: 'classique', pegs: [], ramps: [], spinners: [], bumpers: [], bins, binTop,
+  seed: 0, pattern: 'classique', pegs: [], ramps: [], spinners: [], bumpers: [], bars: [], bins, binTop,
 });
 const midY = (b.top + SPAWN_ZONE + binTop - BIN_CLEAR) / 2;
 /** Déflecteur mural : rampe dont une extrémité touche un mur. */
@@ -18,37 +18,43 @@ const isGuide = (r: { x: number; length: number; angle: number }) => {
 };
 
 describe('validateMap', () => {
+  it('détecte un taquet trop proche d\'une barre bumper', () => {
+    const m = empty();
+    m.bars.push({ x: 500, y: midY, length: 140, angle: 0.3 });
+    m.pegs.push({ x: 500, y: midY + 25, value: 1 });
+    expect(validateMap(m).join()).toMatch(/écart/);
+  });
   it('accepte une carte vide avec des bacs', () => expect(validateMap(empty())).toEqual([]));
 
   it('détecte deux taquets trop proches', () => {
     const m = empty();
-    m.pegs.push({ x: 400, y: midY, golden: false }, { x: 420, y: midY, golden: false });
+    m.pegs.push({ x: 400, y: midY, value: 1 }, { x: 420, y: midY, value: 1 });
     expect(validateMap(m).join()).toMatch(/écart/);
   });
 
   it('détecte un taquet trop proche d\'un tourniquet (rayon de balayage)', () => {
     const m = empty();
     m.spinners.push({ x: 400, y: midY, radius: 46, speed: 0.03 });
-    m.pegs.push({ x: 400 + 46 + 10, y: midY, golden: false });
+    m.pegs.push({ x: 400 + 46 + 10, y: midY, value: 1 });
     expect(validateMap(m).join()).toMatch(/écart/);
   });
 
   it('détecte un taquet trop proche d\'une rampe (distance point–segment)', () => {
     const m = empty();
     m.ramps.push({ x: 500, y: midY, length: 300, angle: 0.4 });
-    m.pegs.push({ x: 500, y: midY + 20, golden: false });
+    m.pegs.push({ x: 500, y: midY + 20, value: 1 });
     expect(validateMap(m).join()).toMatch(/écart/);
   });
 
   it('détecte un élément trop près d\'un mur', () => {
     const m = empty();
-    m.pegs.push({ x: b.left + 12, y: midY, golden: false });
+    m.pegs.push({ x: b.left + 12, y: midY, value: 1 });
     expect(validateMap(m).join()).toMatch(/mur/);
   });
 
   it('détecte un élément dans la zone de spawn', () => {
     const m = empty();
-    m.pegs.push({ x: 600, y: b.top + SPAWN_ZONE / 2, golden: false });
+    m.pegs.push({ x: 600, y: b.top + SPAWN_ZONE / 2, value: 1 });
     expect(validateMap(m).join()).toMatch(/spawn/);
   });
 
@@ -75,6 +81,19 @@ describe('validateMap', () => {
     expect(validateMap(m).join()).toMatch(/plate/);
   });
 
+  it('détecte un taquet sur le trajet d\'un bumper mobile (capsule balayée)', () => {
+    const m = empty();
+    m.bumpers.push({ x: 400, y: midY, radius: 26, move: { x2: 700, y2: midY, periodMs: 5000, phase: 0 } });
+    m.pegs.push({ x: 550, y: midY + 40, value: 1 });
+    expect(validateMap(m).join()).toMatch(/écart/);
+  });
+
+  it('détecte une barre mobile qui ne glisse pas dans son axe', () => {
+    const m = empty();
+    m.bars.push({ x: 400, y: midY, length: 120, angle: 0, move: { x2: 400, y2: midY + 150, periodMs: 5000, phase: 0 } });
+    expect(validateMap(m).join()).toMatch(/axe/);
+  });
+
   it('détecte moins de 5 bacs ou des bacs qui ne couvrent pas la largeur', () => {
     const m = empty();
     m.bins = bins.slice(0, 4);
@@ -83,6 +102,11 @@ describe('validateMap', () => {
 });
 
 describe('generateMap', () => {
+  it('des barres bumpers et des hélices longues sur l\'ensemble des cartes', () => {
+    const maps = Array.from({ length: 200 }, (_, s) => generateMap(s));
+    expect(maps.some((m) => m.bars.length > 0)).toBe(true);
+    expect(maps.some((m) => m.spinners.some((s) => s.radius === SPINNER_R_LONG))).toBe(true);
+  });
   it('même seed → carte identique', () => expect(generateMap(123)).toEqual(generateMap(123)));
 
   it('seeds différentes → cartes différentes', () =>
@@ -126,6 +150,24 @@ describe('generateMap', () => {
     }
   });
 
+  const inLane = (m: MapData, e: { y: number }) => m.laneTop !== undefined && e.y > m.laneTop;
+  const moving = (m: MapData) => [...m.bumpers, ...m.bars, ...m.spinners].filter((e) => e.move && !inLane(m, e));
+
+  it('2 à 4 éléments mobiles par carte, trajets et périodes bornés', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 100; seed++) {
+        const movers = moving(generateMap(seed, pattern)), at = `${pattern} ${seed}`;
+        expect(movers.length, at).toBeGreaterThanOrEqual(MOVERS_MIN);
+        expect(movers.length, at).toBeLessThanOrEqual(MOVERS_MAX);
+        for (const e of movers) {
+          const len = Math.hypot(e.move!.x2 - e.x, e.move!.y2 - e.y);
+          expect(len, at).toBeGreaterThanOrEqual(MOVE_LEN_MIN - 0.5);
+          expect(len, at).toBeLessThanOrEqual(MOVE_LEN_MAX + 0.5);
+        }
+      }
+    }
+  });
+
   it('5 patterns disponibles', () =>
     expect([...PATTERNS].sort()).toEqual(['classique', 'diagonale', 'entonnoirs', 'symetrique', 'trous']));
 
@@ -137,13 +179,18 @@ describe('generateMap', () => {
   it('symétrique : chaque élément a son miroir', () => {
     const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
     const mx = (x: number) => b.left + b.right - x;
+    const sameMove = (p: { move?: Move }, q: { move?: Move }) => !p.move ? !q.move
+      : !!q.move && near(q.move.x2, mx(p.move.x2)) && near(q.move.y2, p.move.y2)
+        && q.move.phase === p.move.phase && q.move.periodMs === p.move.periodMs;
     for (let seed = 0; seed < 50; seed++) {
       const m = generateMap(seed, 'symetrique');
-      for (const p of m.pegs) expect(m.pegs.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y)), `seed ${seed} taquet`).toBe(true);
-      for (const p of m.bumpers) expect(m.bumpers.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y))).toBe(true);
+      for (const p of m.pegs)
+        expect(m.pegs.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y) && q.value === p.value), `seed ${seed} taquet`).toBe(true);
+      for (const p of m.bumpers) expect(m.bumpers.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y) && sameMove(p, q))).toBe(true);
       for (const p of m.spinners)
-        expect(m.spinners.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y) && (near(q.x, p.x) || near(q.speed, -p.speed)))).toBe(true);
+        expect(m.spinners.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y) && (near(q.x, p.x) || near(q.speed, -p.speed)) && sameMove(p, q))).toBe(true);
       for (const r of m.ramps) expect(m.ramps.some((q) => near(q.x, mx(r.x)) && near(q.y, r.y) && near(q.angle, -r.angle))).toBe(true);
+      for (const r of m.bars) expect(m.bars.some((q) => near(q.x, mx(r.x)) && near(q.y, r.y) && near(q.angle, -r.angle) && sameMove(r, q))).toBe(true);
     }
   });
 
@@ -167,7 +214,7 @@ describe('generateMap', () => {
     for (let seed = 0; seed < 50; seed++) {
       const m = generateMap(seed, 'trous');
       expect(m.bumpers.length + m.spinners.length).toBeGreaterThanOrEqual(2);
-      expect(m.pegs.length).toBeGreaterThan(100);
+      expect(m.pegs.length).toBeGreaterThan(90); // zone de jeu réduite par le couloir
     }
   });
 
@@ -179,4 +226,113 @@ describe('generateMap', () => {
       }
     });
   }
+});
+
+describe('taquets à valeur', () => {
+  const count = (m: MapData, v: number) => m.pegs.filter((p) => p.value === v).length;
+
+  it('exactement un taquet à 50, paliers 5 / 10 / 30 en nombres fixes', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 100; seed++) {
+        const m = generateMap(seed, pattern), n = m.pegs.length, at = `${pattern} ${seed}`;
+        expect(count(m, 50), at).toBe(1);
+        expect(count(m, 30), at).toBeGreaterThanOrEqual(1);
+        expect(count(m, 30), at).toBeLessThanOrEqual(Math.max(1, Math.round(n * PEG_SHARE[30])) + 1);
+        for (const v of [5, 10] as const)
+          expect(Math.abs(count(m, v) - Math.round(n * PEG_SHARE[v])), `${at} palier ${v}`).toBeLessThanOrEqual(1);
+        expect(count(m, 1), at).toBeGreaterThan(count(m, 5));
+      }
+    }
+  });
+
+  it('taquets à 30 et 50 espacés d\x27au moins RARE_PEG_SPACING', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 100; seed++) {
+        const rare = generateMap(seed, pattern).pegs.filter((p) => p.value >= 30);
+        for (const p of rare)
+          for (const q of rare)
+            if (p !== q) expect(Math.hypot(p.x - q.x, p.y - q.y), `${pattern} ${seed}`).toBeGreaterThanOrEqual(RARE_PEG_SPACING);
+      }
+    }
+  });
+
+  it('symétrique : le 50 est sur l\x27axe central', () => {
+    for (let seed = 0; seed < 100; seed++) {
+      const fifty = generateMap(seed, 'symetrique').pegs.find((p) => p.value === 50)!;
+      expect(Math.abs(fifty.x - (b.left + b.right) / 2), `seed ${seed}`).toBeLessThan(0.5);
+    }
+  });
+});
+
+describe('couloir du bas', () => {
+  const lane = (m: MapData) => [...m.bumpers, ...m.bars, ...m.spinners].filter((e) => m.laneTop !== undefined && e.y > m.laneTop);
+
+  it('présent par défaut, absent avec lane: false', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 50; seed++) {
+        expect(generateMap(seed, pattern).laneTop, `${pattern} ${seed}`).toBeDefined();
+        const off = generateMap(seed, pattern, b, { lane: false });
+        expect(off.laneTop).toBeUndefined();
+        expect(validateMap(off), `${pattern} ${seed} sans couloir`).toEqual([]);
+      }
+    }
+  });
+
+  it('un élément (deux en miroir en symétrique), horizontal, mobile, lent', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 100; seed++) {
+        const m = generateMap(seed, pattern), els = lane(m), at = `${pattern} ${seed}`;
+        expect(els.length, at).toBe(pattern === 'symetrique' ? 2 : 1);
+        for (const e of els) {
+          expect(e.move, at).toBeDefined();
+          expect(e.move!.y2, at).toBe(e.y);
+          expect(e.move!.periodMs, at).toBe(LANE_PERIOD_MS);
+        }
+      }
+    }
+  });
+
+  it('passage d\'au moins MIN_GAP aux murs et entre les deux éléments au centre', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 100; seed++) {
+        const m = generateMap(seed, pattern), at = `${pattern} ${seed}`;
+        for (const e of lane(m)) {
+          const half = ('length' in e ? e.length / 2 + BAR_THICK / 2 : e.radius); // bouts arrondis compris
+          const minX = Math.min(e.x, e.move!.x2) - half, maxX = Math.max(e.x, e.move!.x2) + half, cx = (b.left + b.right) / 2;
+          // en symétrique, chaque élément reste dans sa moitié, à MIN_GAP/2 du centre
+          const [lo, hi] = pattern === 'symetrique' && e.x > cx ? [cx + MIN_GAP / 2, b.right] : [b.left, pattern === 'symetrique' ? cx - MIN_GAP / 2 : b.right];
+          expect(minX - lo, at).toBeGreaterThanOrEqual(lo === b.left ? MIN_GAP : 0);
+          expect(hi - maxX, at).toBeGreaterThanOrEqual(hi === b.right ? MIN_GAP : 0);
+        }
+      }
+    }
+  });
+
+  it('aucun taquet ni autre élément dans la bande', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 100; seed++) {
+        const m = generateMap(seed, pattern);
+        for (const p of m.pegs) expect(p.y, `${pattern} ${seed}`).toBeLessThan(m.laneTop!);
+        for (const r of m.ramps) expect(r.y, `${pattern} ${seed}`).toBeLessThan(m.laneTop!);
+      }
+    }
+  });
+});
+
+describe('binShifts', () => {
+  it('exemple', () => expect(binShifts([10, 500, 25, 50, 10])).toEqual([0, 1, 2]));
+
+  it('ne met jamais le jackpot au bord, contient 0 et au moins un vrai décalage', () => {
+    for (let seed = 0; seed < 300; seed++) {
+      const pts = generateMap(seed).bins.map((x) => x.points), n = pts.length;
+      const ks = binShifts(pts);
+      expect(ks).toContain(0);
+      expect(ks.length, `seed ${seed}`).toBeGreaterThan(1);
+      for (const k of ks) {
+        const rotated = pts.map((_, i) => pts[(i - k + n) % n]);
+        expect(rotated[0], `seed ${seed} k ${k}`).not.toBe(500);
+        expect(rotated[n - 1], `seed ${seed} k ${k}`).not.toBe(500);
+      }
+    }
+  });
 });
