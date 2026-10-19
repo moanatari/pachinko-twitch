@@ -68,7 +68,7 @@ describe('mergeSettings', () => {
 
 describe('settingsQuery (lien copiable)', () => {
   const s: Settings = {
-    channel: 'machaine', duration: 3, maxBalls: 80, theme: 'noel', shake: false, autoNext: false,
+    channel: 'machaine', duration: 3, maxBalls: 80, theme: 'noel', shake: false, autoNext: false, lane: false,
     specialEvery: 45, specialEffects: 'moon,warp',
   };
   it('aller-retour : le lien redonne exactement les réglages', () =>
@@ -135,4 +135,11 @@ describe('taquets spéciaux', () => {
     expect(formPatch({ specialEvery: '0', specialEffects: ALL_EFFECTS }, DEFAULT_SETTINGS)).toEqual({ specialEvery: 0 });
     expect(formPatch({ specialEvery: '20', specialEffects: '' }, DEFAULT_SETTINGS)).toEqual({ specialEffects: '' });
   });
+});
+
+describe('couloir du bas', () => {
+  it('activé par défaut', () => expect(DEFAULT_SETTINGS.lane).toBe(true));
+  it('lane=0 dans l\'URL', () => expect(mergeSettings(DEFAULT_SETTINGS, {}, '?lane=0').lane).toBe(false));
+  it('valeur sauvegardée invalide → défaut', () => expect(mergeSettings(DEFAULT_SETTINGS, { lane: 'non' }, '').lane).toBe(true));
+  it('formPatch : case décochée', () => expect(formPatch({ ...DEFAULT_SETTINGS, lane: false }, DEFAULT_SETTINGS)).toEqual({ lane: false }));
 });
