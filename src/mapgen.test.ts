@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateMap, validateMap, BOARD_BOUNDS, PATTERNS, type MapData } from './mapgen';
-import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK, PEG_SHARE, RARE_PEG_SPACING } from './config';
+import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK, SPINNER_R_LONG, PEG_SHARE, RARE_PEG_SPACING } from './config';
 
 const b = BOARD_BOUNDS;
 const binTop = b.bottom - BIN_H;
@@ -8,7 +8,7 @@ const bins = Array.from({ length: 7 }, (_, i) => ({
   x: b.left + (i * (b.right - b.left)) / 7, width: (b.right - b.left) / 7, points: 10,
 }));
 const empty = (): MapData => ({
-  seed: 0, pattern: 'classique', pegs: [], ramps: [], spinners: [], bumpers: [], bins, binTop,
+  seed: 0, pattern: 'classique', pegs: [], ramps: [], spinners: [], bumpers: [], bars: [], bins, binTop,
 });
 const midY = (b.top + SPAWN_ZONE + binTop - BIN_CLEAR) / 2;
 /** Déflecteur mural : rampe dont une extrémité touche un mur. */
@@ -18,6 +18,12 @@ const isGuide = (r: { x: number; length: number; angle: number }) => {
 };
 
 describe('validateMap', () => {
+  it('détecte un taquet trop proche d\'une barre bumper', () => {
+    const m = empty();
+    m.bars.push({ x: 500, y: midY, length: 140, angle: 0.3 });
+    m.pegs.push({ x: 500, y: midY + 25, value: 1 });
+    expect(validateMap(m).join()).toMatch(/écart/);
+  });
   it('accepte une carte vide avec des bacs', () => expect(validateMap(empty())).toEqual([]));
 
   it('détecte deux taquets trop proches', () => {
@@ -83,6 +89,11 @@ describe('validateMap', () => {
 });
 
 describe('generateMap', () => {
+  it('des barres bumpers et des hélices longues sur l\'ensemble des cartes', () => {
+    const maps = Array.from({ length: 200 }, (_, s) => generateMap(s));
+    expect(maps.some((m) => m.bars.length > 0)).toBe(true);
+    expect(maps.some((m) => m.spinners.some((s) => s.radius === SPINNER_R_LONG))).toBe(true);
+  });
   it('même seed → carte identique', () => expect(generateMap(123)).toEqual(generateMap(123)));
 
   it('seeds différentes → cartes différentes', () =>
@@ -145,6 +156,7 @@ describe('generateMap', () => {
       for (const p of m.spinners)
         expect(m.spinners.some((q) => near(q.x, mx(p.x)) && near(q.y, p.y) && (near(q.x, p.x) || near(q.speed, -p.speed)))).toBe(true);
       for (const r of m.ramps) expect(m.ramps.some((q) => near(q.x, mx(r.x)) && near(q.y, r.y) && near(q.angle, -r.angle))).toBe(true);
+      for (const r of m.bars) expect(m.bars.some((q) => near(q.x, mx(r.x)) && near(q.y, r.y) && near(q.angle, -r.angle))).toBe(true);
     }
   });
 
