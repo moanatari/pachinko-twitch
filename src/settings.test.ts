@@ -68,7 +68,7 @@ describe('mergeSettings', () => {
 
 describe('settingsQuery (lien copiable)', () => {
   const s: Settings = {
-    channel: 'machaine', duration: 3, maxBalls: 80, theme: 'noel', shake: false, autoNext: false, lane: false, binScroll: 45,
+    channel: 'machaine', duration: 3, maxBalls: 80, theme: 'noel', shake: false, autoNext: false, lane: false, attract: false, binScroll: 45,
     specialEvery: 45, specialEffects: 'moon,warp',
   };
   it('aller-retour : le lien redonne exactement les réglages', () =>
@@ -153,4 +153,10 @@ describe('bacs qui défilent', () => {
   });
   it('valeur sauvegardée invalide → défaut', () => expect(mergeSettings(DEFAULT_SETTINGS, { binScroll: 'x' }, '').binScroll).toBe(30));
   it('formPatch : liste du menu', () => expect(formPatch({ ...DEFAULT_SETTINGS, binScroll: '60' }, DEFAULT_SETTINGS)).toEqual({ binScroll: 60 }));
+});
+
+describe('billes d\'animation', () => {
+  it('activées par défaut', () => expect(DEFAULT_SETTINGS.attract).toBe(true));
+  it('attract=0 dans l\'URL', () => expect(mergeSettings(DEFAULT_SETTINGS, {}, '?attract=0').attract).toBe(false));
+  it('valeur sauvegardée invalide → défaut', () => expect(mergeSettings(DEFAULT_SETTINGS, { attract: 1 }, '').attract).toBe(true));
 });
