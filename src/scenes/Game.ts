@@ -331,7 +331,7 @@ export class Game extends Phaser.Scene {
       const glow = this.track(this.add.image(r.x, r.y, 'fx-glow').setDisplaySize(r.length * 1.1, BAR_THICK * 3)
         .setRotation(r.angle).setBlendMode('ADD').setTint(hex(pal.bumperCore)).setAlpha(0));
       this.els.set(body.id, {
-        kind: 'bumper', points: PTS_BUMPER, half: r.length / 2,
+        kind: 'bumper', points: PTS_BUMPER, half: r.length / 2 - BAR_THICK / 2, // centre des bouts arrondis
         pulse: { kind: 'bumper', v: 0, img, size: r.length, h: BAR_THICK, glow },
       });
       this.mover(body, r, [img, glow]);
