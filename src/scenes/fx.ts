@@ -157,6 +157,9 @@ export class Juice {
     this.sparks.explode(6, x, y);
   }
 
+  /** Bille d'animation qui éclate (fin de l'attente). */
+  pop(x: number, y: number) { this.bursts.explode(10, x, y); }
+
   bin(p: Pulse, x: number, y: number, points: number, big: boolean) {
     this.pulse(p);
     this.confetti.explode(big ? 40 : 10, x, y);

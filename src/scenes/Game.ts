@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import {
   params, BOARD_W, HEIGHT, WALL, BALL_R, PEG_R, MAX_SPEED, RAMP_THICK, SPINNER_ARM, BAR_THICK, SPINNER_R,
   PTS_PEG_GOLDEN, PTS_BUMPER, PTS_SPINNER, HIT_COOLDOWN_MS, BUMPER_SPEED,
-  STUCK_NUDGE_MS, STUCK_KILL_MS, PODIUM_MS, BIG_WIN,
+  STUCK_NUDGE_MS, STUCK_KILL_MS, PODIUM_MS, BIG_WIN, ATTRACT_ALPHA,
 } from '../config';
 import { BOARD_BOUNDS, generateMap, PATTERNS, type MapData, type Move, type PatternId, type PegValue } from '../mapgen';
 import { applyTheme, PEG_TEX } from '../themes/apply';
@@ -24,6 +24,7 @@ import { Juice, type Pulse } from './fx';
 import { ROWS } from './Hud';
 import { Specials } from './specials';
 import { Bins, type BinFace } from './bins';
+import { Attract } from './attract';
 
 type Body = MatterJS.BodyType;
 export type ModAction = 'removeBall' | 'resetScore' | 'ban' | 'unban';
@@ -37,6 +38,7 @@ export interface Ball {
   hits: Map<number, number>; // id d'obstacle → dernier score (cooldown)
   anchor: { x: number; y: number; t: number }; // dernière position « éloignée » (anti-blocage)
   lastNudge: number;
+  fake?: boolean; // bille d'animation : hors GameState, sans points
 }
 
 interface El {
@@ -83,6 +85,8 @@ export class Game extends Phaser.Scene {
   readonly fx = new Juice(this);
   private specials = new Specials(this);
   readonly bins = new Bins(this);
+  private attract = new Attract(this);
+  private fakes = 0;
   private frame = 0; // traînées : une frame sur deux
   private queued = new Map<string, () => void>(); // commandes reçues pendant un chargement, rejouées ensuite
 
@@ -245,6 +249,7 @@ export class Game extends Phaser.Scene {
     this.map = undefined; // suspend update() pendant la transition
     for (const ball of [...this.balls.values()]) this.removeBall(ball);
     this.toRemove.length = 0;
+    this.attract.clear();
     this.specials.clear(); // avant clearMap : la pluie d'or repeint des images de taquets encore vivantes
     this.clearMap();
     const theme = resolveTheme(todayMMDD(params.date), this.forcedTheme ?? (params.theme === 'auto' ? null : params.theme));
@@ -429,20 +434,31 @@ export class Game extends Phaser.Scene {
 
   /** Lâche une bille en x (coordonnée plateau). La bille tombe tout de suite, l'avatar arrive après. */
   private drop(viewer: Viewer, x: number, y = BALL_R + 24): Ball {
+    const hasAvatar = this.textures.exists(avatarKey(viewer.id));
+    const key = hasAvatar ? avatarKey(viewer.id) : fallbackKey(this, viewer, this.theme.font.family, this.theme.palette.ballRim);
+    if (!hasAvatar) this.fetchIdentity(viewer);
+    const ball = this.spawn(viewer.id, x, y, key);
+    this.fx.label(viewer.name, ball.body.position);
+    return ball;
+  }
+
+  /** Bille d'animation (attente) : bille du thème, translucide, sans joueur ni étiquette. */
+  dropFake(x: number) {
+    this.fakes++;
+    this.spawn('', x, BALL_R + 24, 'ball', true).img.setAlpha(ATTRACT_ALPHA);
+  }
+
+  private spawn(userId: string, x: number, y: number, key: string, fake = false): Ball {
     const bx = Phaser.Math.Clamp(x, WALL + BALL_R + 2, BOARD_W - WALL - BALL_R - 2);
     const body = this.matter.add.circle(bx, y, BALL_R, {
       restitution: 0.5, friction: 0.001, frictionAir: 0.0008, label: 'ball',
     });
     this.matter.body.setVelocity(body, { x: Phaser.Math.FloatBetween(-0.6, 0.6), y: 0 });
-    const hasAvatar = this.textures.exists(avatarKey(viewer.id));
-    const key = hasAvatar ? avatarKey(viewer.id) : fallbackKey(this, viewer, this.theme.font.family, this.theme.palette.ballRim);
-    if (!hasAvatar) this.fetchIdentity(viewer);
     const img = this.add.image(bx, y, key).setDisplaySize(BALL_R * 2, BALL_R * 2);
     const ball: Ball = {
-      userId: viewer.id, body, img, done: false, hits: new Map(), anchor: { x: bx, y, t: this.time.now }, lastNudge: 0,
+      userId, body, img, done: false, hits: new Map(), anchor: { x: bx, y, t: this.time.now }, lastNudge: 0, fake,
     };
     this.balls.set(body.id, ball);
-    this.fx.label(viewer.name, body.position);
     return ball;
   }
 
@@ -478,7 +494,8 @@ export class Game extends Phaser.Scene {
       });
   }
 
-  get ballCount() { return this.balls.size; }
+  get ballCount() { return this.balls.size - this.fakes; }
+  get fakeCount() { return this.fakes; }
 
   private onCollision(e: Phaser.Physics.Matter.Events.CollisionStartEvent) {
     for (const pair of e.pairs) {
@@ -491,19 +508,22 @@ export class Game extends Phaser.Scene {
       const { x, y } = ball.body.position;
       if (el.kind === 'bin') {
         ball.done = true; // avant destruction : un 2e événement dans la même frame est ignoré
-        const pts = this.score(ball, el.points, x, y);
-        this.fx.bin(el.pulse, el.binX ?? x, this.map!.binTop, pts, el.points >= BIG_WIN);
+        if (ball.fake) this.fx.pulse(el.pulse); // bille d'animation : le bac s'allume, sans points
+        else {
+          const pts = this.score(ball, el.points, x, y);
+          this.fx.bin(el.pulse, el.binX ?? x, this.map!.binTop, pts, el.points >= BIG_WIN);
+        }
         this.toRemove.push(ball);
         continue;
       }
       if (el.kind === 'bumper') this.bounce(ball, other, el.half);
-      else if (el.kind === 'peg') this.specials.hit(other.id, ball); // avant le cooldown : le 1er contact compte toujours
+      else if (el.kind === 'peg' && !ball.fake) this.specials.hit(other.id, ball); // avant le cooldown : le 1er contact compte toujours
       const last = ball.hits.get(other.id) ?? -Infinity;
       if (this.time.now - last < HIT_COOLDOWN_MS) continue;
       ball.hits.set(other.id, this.time.now);
       const base = el.kind === 'peg' && this.specials.gold ? Math.max(PTS_PEG_GOLDEN, el.points) : el.points;
-      const pts = this.score(ball, base, x, y);
-      this.fx.popup(x, y, pts);
+      const pts = ball.fake ? base : this.score(ball, base, x, y);
+      if (!ball.fake) this.fx.popup(x, y, pts);
       if (el.kind === 'peg') this.fx.peg(el.pulse, x, y, pts);
       else if (el.kind === 'bumper') this.fx.bumper(el.pulse, x, y);
       else this.fx.spinner(el.pulse, x, y);
@@ -552,11 +572,15 @@ export class Game extends Phaser.Scene {
     return pts;
   }
 
-  /** Seul chemin de fin de bille (bac, anti-blocage, reset) : libère toujours le viewer. */
-  private removeBall(ball: Ball) {
+  /** Seul chemin de fin de bille (bac, anti-blocage, reset, éclatement) : libère toujours le viewer. */
+  removeBall(ball: Ball) {
     if (!this.balls.delete(ball.body.id)) return;
     this.matter.world.remove(ball.body);
     ball.img.destroy();
+    if (ball.fake) {
+      this.fakes--;
+      return; // hors GameState
+    }
     this.state.ballFinished(ball.userId);
     this.game.events.emit('ballFinished', ball.userId);
   }
@@ -600,6 +624,7 @@ export class Game extends Phaser.Scene {
     this.fx.update(delta);
     this.specials.update(delta);
     this.bins.update(delta);
+    this.attract.update(delta);
     for (const ball of this.toRemove) this.removeBall(ball);
     this.toRemove.length = 0;
   }

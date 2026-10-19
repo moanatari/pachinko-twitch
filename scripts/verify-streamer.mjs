@@ -279,5 +279,27 @@ await page.keyboard.press('Escape');
 check('binScroll=45 : affiché dans la liste, jamais enregistré', listed === '45' && (await saved()).binScroll !== 45, `liste ${listed}`);
 await page.close();
 
+// 8. Billes d'animation : hors classement et hors plafond, éclatées à la première vraie bille
+page = await open('?debug=1&maxBalls=1');
+const fakes = () => page.evaluate(`[...${G}.balls.values()].filter((b) => b.fake).length`);
+await page.waitForFunction(`[...${G}.balls.values()].some((b) => b.fake)`, null, { timeout: 5000 }).catch(() => {});
+check('attente : billes d\'animation, classement vide, compteur à 0', (await fakes()) > 0
+  && (await page.evaluate(`${G}.state.players.size`)) === 0 && (await page.evaluate(`${G}.ballCount`)) === 0
+  && (await page.evaluate(`${G}.state.waiting`)));
+check('plafond à 1 : le premier joueur joue malgré les billes d\'animation', await page.evaluate(`${G}.requestDrop(${viewer('v9')}, 700)`));
+await page.waitForFunction(`![...${G}.balls.values()].some((b) => b.fake)`, null, { timeout: 3000 }).catch(() => {});
+check('première bille : billes d\'animation éclatées, un seul joueur', (await fakes()) === 0 && (await page.evaluate(`${G}.state.players.size`)) === 1);
+await page.close();
+
+// 8 bis. Changement de thème pendant un défilement des bacs, billes d'animation en jeu : sans erreur
+page = await open('?debug=1&binScroll=1');
+await page.waitForFunction(`[...${G}.balls.values()].some((b) => b.fake) && ${G}.bins.anim >= 0`, null, { timeout: 10_000 }).catch(() => {});
+const themeFrom = await page.evaluate(`${G}.theme.id`);
+await page.evaluate(`${G}.nextTheme()`);
+await page.waitForFunction(`${G}.theme.id !== '${themeFrom}' && !!${G}.map`);
+await page.waitForTimeout(1500);
+check('changement de thème pendant un défilement et des billes d\'animation', errors.length === 0, errors.join(' | '));
+await page.close();
+
 check('aucune erreur JS', errors.length === 0, errors.join(' | '));
 await browser.close();
