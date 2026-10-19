@@ -187,6 +187,7 @@ function init(game: Phaser.Game, g: Game) {
         `<option value="${esc(id)}"${id === params.theme ? ' selected' : ''}>${id === 'auto' ? 'Automatique (date)' : esc(id)}</option>`).join('')}</select></label>
       <label class="menu-check"><input name="shake" type="checkbox"${params.shake ? ' checked' : ''}> Secousses de l'écran</label>
       <label class="menu-check"><input name="autoNext" type="checkbox"${params.autoNext ? ' checked' : ''}> Enchaîner les parties automatiquement</label>
+      <label class="menu-check"><input name="lane" type="checkbox"${params.lane ? ' checked' : ''}> Couloir mobile au-dessus des bacs</label>
       <label>Taquets spéciaux : un toutes les (s, 0 = aucun) <input name="specialEvery" type="number" min="0" max="300" value="${params.specialEvery}"></label>
       ${EFFECTS.map((e) => `<label class="menu-check"><input name="fx-${e.id}" type="checkbox"${params.specialEffects.split(',').includes(e.id) ? ' checked' : ''}> ${esc(e.label)}</label>`).join('')}
     </div>
@@ -194,7 +195,7 @@ function init(game: Phaser.Game, g: Game) {
       <button data-act="apply-now">${APPLY_NOW}</button>
       <button data-act="fullscreen">Plein écran</button>
     </div>
-    <p class="menu-hint">Les changements sont enregistrés automatiquement, sauf la chaîne : « Connecter » ou Entrée. Durée, thème et enchaînement prennent effet à la partie suivante : « ${APPLY_NOW} » n'attend pas, mais coupe la partie en cours et ses scores sont perdus (deux clics pour confirmer).</p>
+    <p class="menu-hint">Les changements sont enregistrés automatiquement, sauf la chaîne : « Connecter » ou Entrée. Durée, thème, couloir et enchaînement prennent effet à la partie suivante : « ${APPLY_NOW} » n'attend pas, mais coupe la partie en cours et ses scores sont perdus (deux clics pour confirmer).</p>
     <h3>Lien pour OBS (sans menu)</h3>
     <div class="menu-link">
       <input name="link" readonly aria-label="Lien pour OBS (sans menu)" value="${esc(obsLink())}">
@@ -253,6 +254,7 @@ function init(game: Phaser.Game, g: Game) {
       theme: field('theme').value,
       shake: field('shake').checked,
       autoNext: field('autoNext').checked,
+      lane: field('lane').checked,
       specialEvery: field('specialEvery').value, // champ vidé : valeur inchangée
       specialEffects: EFFECTS.filter((e) => field(`fx-${e.id}`).checked).map((e) => e.id).join(','),
     }, params);

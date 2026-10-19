@@ -4,7 +4,7 @@ import {
   BOARD_W, HEIGHT, WALL, PEG_R, BUMPER_R, SPINNER_R, RAMP_THICK,
   BAR_THICK, BAR_LEN_MIN, BAR_LEN_MAX, BAR_SHARE, SPINNER_R_LONG, SPINNER_LONG_SHARE, SPINNER_LONG_SPEED,
   SPAWN_ZONE, BIN_H, BIN_CLEAR, MIN_GAP, SPINNER_SPEED, PEG_VALUES, PEG_SHARE, RARE_PEG_SPACING,
-  MOVERS_MIN, MOVERS_MAX, MOVE_LEN_MIN, MOVE_LEN_MAX, MOVE_PERIOD_MIN, MOVE_PERIOD_MAX,
+  MOVERS_MIN, MOVERS_MAX, MOVE_LEN_MIN, MOVE_LEN_MAX, MOVE_PERIOD_MIN, MOVE_PERIOD_MAX, LANE_BAR_LEN, LANE_PERIOD_MS,
 } from './config';
 
 export const PATTERNS = ['classique', 'symetrique', 'diagonale', 'trous', 'entonnoirs'] as const;
@@ -31,6 +31,7 @@ export interface MapData {
   bars: Bar[];
   bins: Bin[];
   binTop: number;
+  laneTop?: number; // haut de l'élément du couloir du bas, absent = pas de couloir
 }
 
 export const RAMP_MIN_ANGLE = 0.25; // rad : en dessous, la bille s'arrête sur la rampe
@@ -240,7 +241,7 @@ class Builder {
 
   /** Zone jouable verticale (hors spawn et bande des bacs). */
   get playTop() { return this.b.top + SPAWN_ZONE; }
-  get playBottom() { return this.m.binTop - BIN_CLEAR; }
+  get playBottom() { return this.m.laneTop !== undefined ? this.m.laneTop - MIN_GAP : this.m.binTop - BIN_CLEAR; }
 }
 
 /** Valeurs tirées à chaque carte : un seul jackpot (500), jamais sur un bord ; bords toujours bas.
@@ -261,11 +262,28 @@ function makeBins(rng: Rng, b: Bounds, symmetric: boolean): Bin[] {
   return pts.map((points, i) => ({ x: b.left + i * width, width, points }));
 }
 
+/** Couloir du bas : un élément en aller-retour de mur à mur juste au-dessus de la bande des bacs (deux en
+ *  miroir en symétrique, un par moitié). La zone de jeu remonte au-dessus de lui. */
+function lane(g: Builder, symmetric: boolean) {
+  const { rng, b } = g;
+  const kind = rng.pick(['bumper', 'bar', 'spinner'] as const);
+  const r = kind === 'bumper' ? BUMPER_R : kind === 'bar' ? BAR_THICK / 2 : g.spinnerRadius(); // demi-hauteur
+  const half = kind === 'bar' ? LANE_BAR_LEN / 2 + r : r; // demi-largeur, bouts arrondis compris
+  const y = g.m.binTop - BIN_CLEAR - r - 1;
+  const x = b.left + MIN_GAP + half + 1;
+  const x2 = (symmetric ? g.cx - MIN_GAP / 2 : b.right - MIN_GAP) - half - 1;
+  const move: Move = { x2, y2: y, periodMs: LANE_PERIOD_MS, phase: rng.next() };
+  const spec: Spec = kind === 'bumper' ? { kind, x, y, radius: r, move }
+    : kind === 'bar' ? { kind, x, y, length: LANE_BAR_LEN, angle: 0, move }
+      : { kind, x, y, radius: r, speed: g.spinnerSpeed(r), move };
+  if (symmetric ? g.place([spec, g.mirror(spec)]) : g.place([spec])) g.m.laneTop = y - r;
+}
+
 /** Déflecteurs collés aux murs, en quinconce : pas de couloir libre le long des bords. */
 function wallGuides(g: Builder, symmetric: boolean) {
   const r = RAMP_THICK / 2;
   for (const side of symmetric ? ['left'] : ['left', 'right']) {
-    for (let y = g.playTop + (side === 'left' ? 50 : 140); y < g.playBottom - 90; y += g.rng.range(170, 210)) {
+    for (let y = g.playTop + (side === 'left' ? 50 : 140); y < g.playBottom - 40; y += g.rng.range(170, 210)) {
       const L = g.rng.range(55, 80), a = g.rng.range(0.5, 0.7);
       const dx = (Math.cos(a) * L) / 2, dy = (Math.sin(a) * L) / 2;
       const spec: Spec = side === 'left'
@@ -475,7 +493,7 @@ function pegValues(g: Builder, symmetric: boolean) {
 
 const GENERATORS: Record<PatternId, (g: Builder) => void> = { classique, symetrique, diagonale, trous, entonnoirs };
 
-export function generateMap(seed: number, pattern?: PatternId, b: Bounds = BOARD_BOUNDS): MapData {
+export function generateMap(seed: number, pattern?: PatternId, b: Bounds = BOARD_BOUNDS, opts: { lane?: boolean } = {}): MapData {
   const rng = new Rng(seed);
   const p = pattern ?? rng.pick(PATTERNS);
   const m: MapData = {
@@ -483,6 +501,7 @@ export function generateMap(seed: number, pattern?: PatternId, b: Bounds = BOARD
   };
   const g = new Builder(m, b, rng);
   const symmetric = p === 'symetrique';
+  if (opts.lane ?? true) lane(g, symmetric);
   wallGuides(g, symmetric);
   g.deferPegs();
   GENERATORS[p](g);

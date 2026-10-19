@@ -57,7 +57,7 @@ terminée et vérifiée.
 - [x] 19. Taquets à valeur (1, 5, 10, 30, 50) (spec `docs/superpowers/specs/2026-10-19-mobiles-couloir-bacs-taquets-design.md`, plan `docs/superpowers/plans/2026-10-19-mobiles-couloir-bacs-taquets.md`)
 - [x] 20. Barres bumpers et hélices longues (même spec, même plan)
 - [x] 21. Éléments mobiles (même spec, même plan)
-- [ ] 22. Couloir du bas (même spec, même plan)
+- [x] 22. Couloir du bas (même spec, même plan)
 - [ ] 23. Bacs qui défilent (même spec, même plan)
 - [ ] 24. Billes d'animation pendant l'attente (même spec, même plan)
 - [ ] 25. Réglages en sous-onglets, onglet « À propos », version automatique (même plan)
@@ -714,9 +714,11 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
       À valider à l'œil sur `dev` : aucune bille coincée par un mobile, reprise après pause sans saut.
 
 ### 22. Couloir du bas
-- [ ] Réglage `lane` (menu + URL `lane=0`, carte suivante).
-- [ ] Un élément de mur à mur au-dessus des bacs, deux en miroir en symétrique ; passage ≥ `MIN_GAP` aux bouts.
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps.
+- [x] Réglage `lane` (menu + URL `lane=0`, carte suivante).
+- [x] Un élément de mur à mur au-dessus des bacs, deux en miroir en symétrique ; passage ≥ `MIN_GAP` aux bouts.
+- ⚠️ « Rejouer cette carte » suit le réglage `lane` courant (l'historique ne garde que seed + motif).
+- [x] **Vérif** : `npm run test` (259) et `npm run verify` verts, 158 fps headless à 150 billes.
+      À valider à l'œil sur `dev` : balayage mur à mur, deux éléments en miroir en symétrique, case décochée.
 
 ### 23. Bacs qui défilent
 - [ ] Réglage `binScroll` (désactivé / 30 s / 1 min, URL 0–300) ; `binShifts` (jackpot jamais au bord).

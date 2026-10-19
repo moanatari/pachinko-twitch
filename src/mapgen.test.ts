@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateMap, validateMap, BOARD_BOUNDS, PATTERNS, type MapData, type Move } from './mapgen';
-import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK, SPINNER_R_LONG, PEG_SHARE, RARE_PEG_SPACING, MOVERS_MIN, MOVERS_MAX, MOVE_LEN_MIN, MOVE_LEN_MAX } from './config';
+import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK, BAR_THICK, SPINNER_R_LONG, PEG_SHARE, RARE_PEG_SPACING, MOVERS_MIN, MOVERS_MAX, MOVE_LEN_MIN, MOVE_LEN_MAX, MIN_GAP, LANE_PERIOD_MS } from './config';
 
 const b = BOARD_BOUNDS;
 const binTop = b.bottom - BIN_H;
@@ -150,7 +150,8 @@ describe('generateMap', () => {
     }
   });
 
-  const moving = (m: MapData) => [...m.bumpers, ...m.bars, ...m.spinners].filter((e) => e.move);
+  const inLane = (m: MapData, e: { y: number }) => m.laneTop !== undefined && e.y > m.laneTop;
+  const moving = (m: MapData) => [...m.bumpers, ...m.bars, ...m.spinners].filter((e) => e.move && !inLane(m, e));
 
   it('2 à 4 éléments mobiles par carte, trajets et périodes bornés', () => {
     for (const pattern of PATTERNS) {
@@ -213,7 +214,7 @@ describe('generateMap', () => {
     for (let seed = 0; seed < 50; seed++) {
       const m = generateMap(seed, 'trous');
       expect(m.bumpers.length + m.spinners.length).toBeGreaterThanOrEqual(2);
-      expect(m.pegs.length).toBeGreaterThan(100);
+      expect(m.pegs.length).toBeGreaterThan(90); // zone de jeu réduite par le couloir
     }
   });
 
@@ -259,6 +260,61 @@ describe('taquets à valeur', () => {
     for (let seed = 0; seed < 100; seed++) {
       const fifty = generateMap(seed, 'symetrique').pegs.find((p) => p.value === 50)!;
       expect(Math.abs(fifty.x - (b.left + b.right) / 2), `seed ${seed}`).toBeLessThan(0.5);
+    }
+  });
+});
+
+describe('couloir du bas', () => {
+  const lane = (m: MapData) => [...m.bumpers, ...m.bars, ...m.spinners].filter((e) => m.laneTop !== undefined && e.y > m.laneTop);
+
+  it('présent par défaut, absent avec lane: false', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 50; seed++) {
+        expect(generateMap(seed, pattern).laneTop, `${pattern} ${seed}`).toBeDefined();
+        const off = generateMap(seed, pattern, b, { lane: false });
+        expect(off.laneTop).toBeUndefined();
+        expect(validateMap(off), `${pattern} ${seed} sans couloir`).toEqual([]);
+      }
+    }
+  });
+
+  it('un élément (deux en miroir en symétrique), horizontal, mobile, lent', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 100; seed++) {
+        const m = generateMap(seed, pattern), els = lane(m), at = `${pattern} ${seed}`;
+        expect(els.length, at).toBe(pattern === 'symetrique' ? 2 : 1);
+        for (const e of els) {
+          expect(e.move, at).toBeDefined();
+          expect(e.move!.y2, at).toBe(e.y);
+          expect(e.move!.periodMs, at).toBe(LANE_PERIOD_MS);
+        }
+      }
+    }
+  });
+
+  it('passage d\'au moins MIN_GAP aux murs et entre les deux éléments au centre', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 100; seed++) {
+        const m = generateMap(seed, pattern), at = `${pattern} ${seed}`;
+        for (const e of lane(m)) {
+          const half = ('length' in e ? e.length / 2 + BAR_THICK / 2 : e.radius); // bouts arrondis compris
+          const minX = Math.min(e.x, e.move!.x2) - half, maxX = Math.max(e.x, e.move!.x2) + half, cx = (b.left + b.right) / 2;
+          // en symétrique, chaque élément reste dans sa moitié, à MIN_GAP/2 du centre
+          const [lo, hi] = pattern === 'symetrique' && e.x > cx ? [cx + MIN_GAP / 2, b.right] : [b.left, pattern === 'symetrique' ? cx - MIN_GAP / 2 : b.right];
+          expect(minX - lo, at).toBeGreaterThanOrEqual(lo === b.left ? MIN_GAP : 0);
+          expect(hi - maxX, at).toBeGreaterThanOrEqual(hi === b.right ? MIN_GAP : 0);
+        }
+      }
+    }
+  });
+
+  it('aucun taquet ni autre élément dans la bande', () => {
+    for (const pattern of PATTERNS) {
+      for (let seed = 0; seed < 100; seed++) {
+        const m = generateMap(seed, pattern);
+        for (const p of m.pegs) expect(p.y, `${pattern} ${seed}`).toBeLessThan(m.laneTop!);
+        for (const r of m.ramps) expect(r.y, `${pattern} ${seed}`).toBeLessThan(m.laneTop!);
+      }
     }
   });
 });
