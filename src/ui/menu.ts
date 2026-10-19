@@ -209,12 +209,13 @@ function init(game: Phaser.Game, g: Game) {
         <button data-act="apply-now">${APPLY_NOW}</button>
         <button data-act="fullscreen">Plein écran</button>
       </div>
-      <p class="menu-hint">Les changements sont enregistrés automatiquement. Durée, thème, couloir et enchaînement prennent effet à la partie suivante : « ${APPLY_NOW} » n'attend pas, mais coupe la partie en cours et ses scores sont perdus (deux clics pour confirmer).</p>
+      <p class="menu-hint">Les changements sont enregistrés automatiquement. Durée, couloir et enchaînement prennent effet à la partie suivante : « ${APPLY_NOW} » n'attend pas, mais coupe la partie en cours et ses scores sont perdus (deux clics pour confirmer).</p>
     </section>
     <section data-group="fx">
       <div class="menu-form">
         <label>Thème <select name="theme">${[...new Set(['auto', ...Object.keys(THEMES), params.theme])].map((id) => // id inconnu (URL, ancien réglage) : listé, sinon la liste retomberait sur « auto » et l'enregistrerait
           `<option value="${esc(id)}"${id === params.theme ? ' selected' : ''}>${id === 'auto' ? 'Automatique (date)' : esc(id)}</option>`).join('')}</select></label>
+        <p class="menu-hint">Le thème est appliqué à la prochaine partie.</p>
         <label class="menu-check"><input name="shake" type="checkbox"${params.shake ? ' checked' : ''}> Secousses de l'écran</label>
         <label>Taquets spéciaux : un toutes les (s, 0 = aucun) <input name="specialEvery" type="number" min="0" max="300" value="${params.specialEvery}"></label>
         ${EFFECTS.map((e) => `<label class="menu-check"><input name="fx-${e.id}" type="checkbox"${params.specialEffects.split(',').includes(e.id) ? ' checked' : ''}> ${esc(e.label)}</label>`).join('')}

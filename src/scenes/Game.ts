@@ -52,7 +52,6 @@ interface El {
 interface SpinnerRt { body: Body; img: Phaser.GameObjects.Image; speed: number }
 /** Élément en aller-retour : corps et images déplacés ensemble. `pos` réutilisé : aucune allocation par pas. */
 interface MoverRt { body: Body; imgs: Phaser.GameObjects.Image[]; x: number; y: number; move: Move; t: number; pos: { x: number; y: number } }
-/** Taquet non doré de la carte : candidat aux taquets spéciaux, repeint par la pluie d'or. */
 /** Taquet à moins de 10 points : repeint par la pluie d'or ; ceux à 1 point sont candidats aux taquets spéciaux. */
 export interface PegRt { x: number; y: number; bodyId: number; img: Phaser.GameObjects.Image; value: PegValue }
 
@@ -525,7 +524,7 @@ export class Game extends Phaser.Scene {
       const pts = ball.fake ? base : this.score(ball, base, x, y);
       if (!ball.fake) this.fx.popup(x, y, pts);
       if (el.kind === 'peg') this.fx.peg(el.pulse, x, y, pts);
-      else if (el.kind === 'bumper') this.fx.bumper(el.pulse, x, y);
+      else if (el.kind === 'bumper') this.fx.bumper(el.pulse, x, y, ball.fake);
       else this.fx.spinner(el.pulse, x, y);
     }
   }
