@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateMap, validateMap, BOARD_BOUNDS, PATTERNS, type MapData, type Move } from './mapgen';
+import { generateMap, binShifts, validateMap, BOARD_BOUNDS, PATTERNS, type MapData, type Move } from './mapgen';
 import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK, BAR_THICK, SPINNER_R_LONG, PEG_SHARE, RARE_PEG_SPACING, MOVERS_MIN, MOVERS_MAX, MOVE_LEN_MIN, MOVE_LEN_MAX, MIN_GAP, LANE_PERIOD_MS } from './config';
 
 const b = BOARD_BOUNDS;
@@ -314,6 +314,24 @@ describe('couloir du bas', () => {
         const m = generateMap(seed, pattern);
         for (const p of m.pegs) expect(p.y, `${pattern} ${seed}`).toBeLessThan(m.laneTop!);
         for (const r of m.ramps) expect(r.y, `${pattern} ${seed}`).toBeLessThan(m.laneTop!);
+      }
+    }
+  });
+});
+
+describe('binShifts', () => {
+  it('exemple', () => expect(binShifts([10, 500, 25, 50, 10])).toEqual([0, 1, 2]));
+
+  it('ne met jamais le jackpot au bord, contient 0 et au moins un vrai décalage', () => {
+    for (let seed = 0; seed < 300; seed++) {
+      const pts = generateMap(seed).bins.map((x) => x.points), n = pts.length;
+      const ks = binShifts(pts);
+      expect(ks).toContain(0);
+      expect(ks.length, `seed ${seed}`).toBeGreaterThan(1);
+      for (const k of ks) {
+        const rotated = pts.map((_, i) => pts[(i - k + n) % n]);
+        expect(rotated[0], `seed ${seed} k ${k}`).not.toBe(500);
+        expect(rotated[n - 1], `seed ${seed} k ${k}`).not.toBe(500);
       }
     }
   });
