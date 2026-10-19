@@ -16,7 +16,7 @@ Aucun backend, aucun token Twitch.
 ## Commandes
 - `npm run dev` — serveur de dev (clic = bille du streamer, Échap = menu ; `/?debug=1` : touche B = bots, T = thème)
 - `npm run build` / `npm run preview` — build statique
-- `npm run test` — vitest (mapgen, réglages, état, bans, historique, top du mois, taquets spéciaux, parse IRC)
+- `npm run test` — vitest (mapgen dont mobiles, couloir et taquets à valeur, réglages, état, bans, historique, top du mois, taquets spéciaux, parse IRC)
 - `npm run verify` — vérification navigateur du mode streamer (Playwright sur le Chrome installé, dev server lancé)
 
 ## Git
@@ -39,6 +39,8 @@ Aucun backend, aucun token Twitch.
 - Taquets spéciaux : `src/game/specials.ts` (catalogue des effets + tirage, pur) et `src/scenes/specials.ts`
   (taquet allumé, effets, possédé par `Game` comme `Juice`). Spec :
   `docs/superpowers/specs/2026-10-11-timer-top-du-mois-taquets-speciaux-design.md`.
+- Bacs qui défilent : `src/scenes/bins.ts` ; billes d'animation (attente) : `src/scenes/attract.ts`. Possédés par `Game` comme
+  `Specials`. Spec : `docs/superpowers/specs/2026-10-19-mobiles-couloir-bacs-taquets-design.md`.
 - `src/twitch/` : `chat.ts` (IRC WebSocket anonyme), `heat.ts` (WebSocket Heat), `users.ts` (lookup + avatars).
 - Communication via `game.events` (Phaser EventEmitter), pas de bus maison.
 - `src/themes/` : thèmes visuels (spec : `docs/superpowers/specs/2026-10-02-themes-design.md`).

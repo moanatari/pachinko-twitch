@@ -59,7 +59,7 @@ terminée et vérifiée.
 - [x] 21. Éléments mobiles (même spec, même plan)
 - [x] 22. Couloir du bas (même spec, même plan)
 - [x] 23. Bacs qui défilent (même spec, même plan)
-- [ ] 24. Billes d'animation pendant l'attente (même spec, même plan)
+- [x] 24. Billes d'animation pendant l'attente (même spec, même plan)
 - [ ] 25. Réglages en sous-onglets, onglet « À propos », version automatique (même plan)
 
 ## Décisions prises
@@ -727,8 +727,9 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
       À valider à l'œil sur `dev` : glissement de la bande et fondu aux bords.
 
 ### 24. Billes d'animation
-- [ ] Réglage `attract` ; `src/scenes/attract.ts` : billes hors `GameState` pendant l'attente, figées puis éclatées à la première vraie bille.
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts (classement vide, plafond, changement de thème) ; 60 fps.
+- [x] Réglage `attract` ; `src/scenes/attract.ts` : billes hors `GameState` pendant l'attente, figées puis éclatées à la première vraie bille.
+- [x] **Vérif** : `npm run test` (268) et `npm run verify` verts (classement vide, plafond, changement de thème) ; 158 fps headless.
+      À valider à l'œil sur `dev` : chute des billes d'animation, gel puis éclatement à la première vraie bille.
 
 ### 25. Réglages en sous-onglets, « À propos », version automatique
 - [ ] Version `majeur.mineur.<nombre de commits>` + commit + date, injectée au build (`vite.config.ts`, `__BUILD__`) ; `pages.yml` en `fetch-depth: 0`.
