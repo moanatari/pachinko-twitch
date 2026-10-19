@@ -441,7 +441,7 @@ function entonnoirs(g: Builder) {
 function movers(g: Builder, symmetric: boolean) {
   const { rng, b } = g;
   const want = symmetric ? 2 * rng.int(MOVERS_MIN / 2, MOVERS_MAX / 2) : rng.int(MOVERS_MIN, MOVERS_MAX);
-  for (let tries = 0, placed = 0; placed < want && tries < 300; tries++) {
+  for (let tries = 0, placed = 0; placed < want && tries < 600; tries++) {
     const len = rng.range(MOVE_LEN_MIN, MOVE_LEN_MAX);
     const a = rng.chance(0.75) ? rng.range(-0.3, 0.3) : rng.range(-1.2, 1.2); // surtout horizontal
     const x = rng.range(b.left, symmetric ? g.cx : b.right), y = rng.range(g.playTop, g.playBottom);

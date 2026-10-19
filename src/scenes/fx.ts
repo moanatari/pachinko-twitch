@@ -141,7 +141,8 @@ export class Juice {
     else this.sparks.explode(points >= 5 ? 7 : 4, x, y);
   }
 
-  bumper(p: Pulse, x: number, y: number) {
+  /** `quiet` : bille d'animation, juice sans secousse. */
+  bumper(p: Pulse, x: number, y: number, quiet = false) {
     this.pulse(p);
     this.bursts.explode(14, x, y);
     const r = this.rings[this.ri++ % RINGS];
@@ -149,7 +150,7 @@ export class Juice {
     // barre : petite onde au point de contact ; bumper rond : onde centrée sur l'ampoule
     r.size = (p.h ? p.h * 4 : p.size ?? 52) * 2.6;
     r.img.setPosition(p.h ? x : p.img!.x, p.h ? y : p.img!.y).setTint(this.colors.core).setVisible(true);
-    this.shake(70, 0.0025);
+    if (!quiet) this.shake(70, 0.0025);
   }
 
   spinner(p: Pulse, x: number, y: number) {
