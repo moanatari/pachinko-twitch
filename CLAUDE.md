@@ -21,9 +21,12 @@ Aucun backend, aucun token Twitch.
 
 ## Git
 `main` = production : chaque push déploie sur GitHub Pages (`pages.yml`, tests puis build). Ne jamais y pousser directement.
-- Une branche courte par étape du PLAN (`feat/…`, `fix/…`, `ci/…`), créée depuis `main` à jour.
+`dev` = intégration : tout y est fusionné et testé par un humain avant de partir en production.
+- Une branche courte par étape du PLAN (`feat/…`, `fix/…`, `ci/…`), créée depuis `dev` à jour.
 - `npm run test` et `npm run verify` verts en local (verify ne tourne pas en CI : Chrome installé + Twitch en direct).
-- `gh pr create --fill`, attendre la CI (`ci.yml` : tests + build), puis `gh pr merge --squash --delete-branch`.
+- `gh pr create --fill --base dev`, attendre la CI (`ci.yml` : tests + build), puis `gh pr merge --squash --delete-branch`.
+- Mise en production : seulement après test humain de `dev` et accord explicite. PR `dev` → `main`, fusionnée
+  avec `gh pr merge --merge` (pas de squash : `dev` et `main` gardent la même histoire ; jamais `--delete-branch`).
 
 ## Architecture
 - `src/mapgen.ts` : génération procédurale **pure** (seed → éléments). Ne jamais importer Phaser ici.
