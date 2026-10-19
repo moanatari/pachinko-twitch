@@ -55,7 +55,7 @@ terminée et vérifiée.
 - [x] 17. Réglages enregistrés automatiquement, croix de fermeture, lien OBS sans menu (`menu=0`)
 - [x] 18. Chaîne connectée par un bouton, état de la connexion affiché
 - [x] 19. Taquets à valeur (1, 5, 10, 30, 50) (spec `docs/superpowers/specs/2026-10-19-mobiles-couloir-bacs-taquets-design.md`, plan `docs/superpowers/plans/2026-10-19-mobiles-couloir-bacs-taquets.md`)
-- [ ] 20. Barres bumpers et hélices longues (même spec, même plan)
+- [x] 20. Barres bumpers et hélices longues (même spec, même plan)
 - [ ] 21. Éléments mobiles (même spec, même plan)
 - [ ] 22. Couloir du bas (même spec, même plan)
 - [ ] 23. Bacs qui défilent (même spec, même plan)
@@ -701,9 +701,10 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
       À valider à l'œil sur `dev` : rendu des paliers dans chaque thème (touche T).
 
 ### 20. Barres bumpers et hélices longues
-- [ ] `Bar` (capsule, rebond perpendiculaire), une fois sur trois à la place d'un bumper dans les motifs.
-- [ ] Hélices longues (≈ 1 sur 3, plus lentes), texture `spinnerLong` (reprend l'hélice du thème s'il en dessine une).
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; 60 fps.
+- [x] `Bar` (capsule, rebond perpendiculaire), une fois sur trois à la place d'un bumper dans les motifs.
+- [x] Hélices longues (≈ 1 sur 3, plus lentes), texture `spinnerLong` (reprend l'hélice du thème s'il en dessine une).
+- [x] **Vérif** : `npm run test` (248) et `npm run verify` verts, 158 fps headless à 150 billes.
+      À valider à l'œil sur `dev` : rebond sur une barre, bras fins des hélices longues, étoile de mer du thème Plage.
 
 ### 21. Éléments mobiles
 - [ ] `move` sur bumpers, barres, hélices ; capsule balayée dans les règles ; 2 à 4 mobiles posés avant les taquets.
