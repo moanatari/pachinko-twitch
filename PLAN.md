@@ -736,7 +736,7 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
 - [x] Réglages : sous-onglets Chaîne · Partie · Effets · Exclus (bascule de visibilité, enregistrement auto inchangé).
 - [x] Onglet « À propos » : version, langages, technos et versions installées, lien vers le dépôt GitHub.
 - [x] **Vérif** : `npm run test` (268) et `npm run verify` verts ; version `v0.1.53` dans le bundle.
-- [ ] Après la mise en production : « À propos » de la GitHub Page affiche la version sans « (dev) », dernier chiffre = nombre de commits de `main`.
+- [x] Après la mise en production : « À propos » de la GitHub Page affiche la version sans « (dev) », dernier chiffre = nombre de commits de `main` (`v0.1.55`, 770f727).
 
 ## Vérification
 - `npm run test` : `mapgen.test.ts` (1000 seeds × 5 patterns respectent les règles),
