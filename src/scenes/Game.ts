@@ -4,7 +4,7 @@ import {
   PTS_PEG_GOLDEN, PTS_BUMPER, PTS_SPINNER, HIT_COOLDOWN_MS, BUMPER_SPEED,
   STUCK_NUDGE_MS, STUCK_KILL_MS, PODIUM_MS, BIG_WIN,
 } from '../config';
-import { generateMap, PATTERNS, type MapData, type Move, type PatternId, type PegValue } from '../mapgen';
+import { BOARD_BOUNDS, generateMap, PATTERNS, type MapData, type Move, type PatternId, type PegValue } from '../mapgen';
 import { applyTheme, PEG_TEX } from '../themes/apply';
 import { resolveTheme, todayMMDD } from '../themes/resolve';
 import type { Theme } from '../themes/types';
@@ -260,7 +260,7 @@ export class Game extends Phaser.Scene {
       this.game.registry.set('theme', theme);
       this.game.events.emit('theme', theme);
     }
-    this.buildMap(generateMap(seed, pattern));
+    this.buildMap(generateMap(seed, pattern, BOARD_BOUNDS, { lane: params.lane }));
     this.state.start(Date.now(), params.duration * 60_000);
     this.recorded = false;
     this.warmMonthly();
