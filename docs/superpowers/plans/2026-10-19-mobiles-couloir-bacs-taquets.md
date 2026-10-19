@@ -1691,3 +1691,273 @@ Run: `npm run verify` → tout OK.
       `- Bacs qui défilent : src/scenes/bins.ts ; billes d'animation (attente) : src/scenes/attract.ts. Possédés par Game comme Specials. Spec : docs/superpowers/specs/2026-10-19-mobiles-couloir-bacs-taquets-design.md.`
 - [ ] Commit `docs: PLAN étape 24, CLAUDE.md`.
 - [ ] `git push -u origin feat/billes-animation && gh pr create --fill && gh pr checks --watch && gh pr merge --squash --delete-branch && git checkout main && git pull --ff-only`
+
+---
+
+## Étape 25 — Réglages en sous-onglets, onglet « À propos », version automatique
+
+Demandé après la spec (design validé en conversation, pas de spec séparée) : ranger les réglages en sous-onglets,
+ajouter un onglet « À propos » (technos, langages, versions, lien GitHub) et une version du jeu qui augmente toute seule.
+
+**Choix validés** : sous-onglets dans « Réglages » (Chaîne · Partie · Effets · Exclus) ; version calculée au build :
+`majeur.mineur` de `package.json` + nombre de commits (`v0.1.48 · 0ca91f2 · 19/10/2026`), rien n'est commité par la CI.
+
+Branche : `git checkout main && git pull --ff-only && git checkout -b feat/menu-a-propos`
+
+### Task 25.1 : Version et versions des outils injectées au build
+
+**Files:**
+- Modify: `vite.config.ts`, `.github/workflows/pages.yml`
+- Create: `src/build-info.d.ts`
+
+**Interfaces:**
+- Produces: constante globale `__BUILD__: { version: string; commit: string; date: string; dev: boolean; deps: { phaser: string; vite: string; typescript: string; vitest: string; playwright: string } }`.
+
+- [ ] **Step 1 : `vite.config.ts`** (remplace tout le fichier)
+
+```ts
+import { defineConfig } from 'vite';
+import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+
+const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
+const git = (args: string) => {
+  try {
+    return execSync(`git ${args}`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    return ''; // archive sans .git : version en x.y.0, sans commit
+  }
+};
+// version affichée dans « À propos » : majeur.mineur de package.json + nombre de commits (une PR fusionnée = +1)
+const [major, minor] = json('package.json').version.split('.');
+const dep = (name: string): string => json(`node_modules/${name}/package.json`).version;
+
+// base relative : dist/index.html utilisable en « Fichier local » dans OBS
+export default defineConfig(({ command }) => ({
+  base: './',
+  build: { chunkSizeWarningLimit: 2000 },
+  define: {
+    __BUILD__: JSON.stringify({
+      version: `${major}.${minor}.${git('rev-list --count HEAD') || 0}`,
+      commit: git('rev-parse --short HEAD'),
+      date: new Date().toISOString().slice(0, 10),
+      dev: command === 'serve',
+      deps: { phaser: dep('phaser'), vite: dep('vite'), typescript: dep('typescript'), vitest: dep('vitest'), playwright: dep('playwright-core') },
+    }),
+  },
+}));
+```
+
+- [ ] **Step 2 : `src/build-info.d.ts`**
+
+```ts
+/** Injecté par vite.config.ts (define) : version calculée au build et versions des outils installés. */
+declare const __BUILD__: {
+  version: string;
+  commit: string;
+  date: string; // AAAA-MM-JJ
+  dev: boolean; // npm run dev
+  deps: { phaser: string; vite: string; typescript: string; vitest: string; playwright: string };
+};
+```
+
+- [ ] **Step 3 : Historique complet au déploiement**
+
+Dans `.github/workflows/pages.yml`, remplacer `- uses: actions/checkout@v4` par :
+
+```yaml
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # nombre de commits = dernier chiffre de la version
+```
+
+- [ ] **Step 4 : Vérifier**
+
+Run: `npm run build && grep -o 'version:"[0-9.]*"' dist/assets/*.js | head -1`
+Expected: build vert, version `0.1.<n>` avec `n` = `git rev-list --count HEAD`.
+
+- [ ] **Step 5 :** `git add vite.config.ts src/build-info.d.ts .github/workflows/pages.yml && git commit -m "build: version du jeu calculée au build (nombre de commits)"`
+
+### Task 25.2 : Sous-onglets des réglages et onglet « À propos »
+
+**Files:**
+- Create: `src/ui/about.ts`
+- Modify: `src/ui/menu.ts` (`Tab`, `TABS`, `settingsHtml`, `render`, gestionnaire `pointerdown`, premier lancement), `src/ui/menu.css`, `scripts/verify-streamer.mjs`
+
+**Interfaces:**
+- Consumes: `__BUILD__` (Task 25.1) ; champs `lane`, `binScroll`, `attract` (étapes 22–24).
+- Produces: `aboutHtml(): string` ; attributs `data-sub` (boutons) et `data-group` (sections) dans l'onglet Réglages.
+
+- [ ] **Step 1 : `src/ui/about.ts`**
+
+```ts
+// Onglet « À propos » : version (calculée au build, voir vite.config.ts), technos et dépôt.
+const REPO = 'https://github.com/moanatari/pachinko-twitch';
+
+export function aboutHtml(): string {
+  const b = __BUILD__;
+  const date = b.date.split('-').reverse().join('/');
+  return `
+    <h3>Pachinko Twitch</h3>
+    <dl class="menu-info">
+      <dt>Version</dt><dd>v${b.version}${b.commit ? ` · ${b.commit}` : ''} · ${date}${b.dev ? ' (dev)' : ''}</dd>
+      <dt>Langages</dt><dd>TypeScript, HTML, CSS</dd>
+      <dt>Moteur</dt><dd>Phaser ${b.deps.phaser} (WebGL), Matter.js intégré</dd>
+      <dt>Outils</dt><dd>Vite ${b.deps.vite} · TypeScript ${b.deps.typescript} · vitest ${b.deps.vitest} · Playwright ${b.deps.playwright}</dd>
+      <dt>Twitch</dt><dd>Tchat IRC anonyme, extension Heat</dd>
+      <dt>Code source</dt><dd><a href="${REPO}" target="_blank" rel="noopener">${REPO.replace('https://', '')}</a></dd>
+    </dl>`;
+}
+```
+
+- [ ] **Step 2 : `src/ui/menu.ts`**
+
+Import : `import { aboutHtml } from './about';`.
+
+Onglets :
+
+```ts
+type Tab = 'game' | 'players' | 'history' | 'settings' | 'about';
+const TABS: [Tab, string][] = [
+  ['game', 'Partie'], ['players', 'Joueurs'], ['history', 'Historique'], ['settings', 'Réglages'], ['about', 'À propos'],
+];
+type Sub = 'channel' | 'play' | 'fx' | 'bans';
+const SUBS: [Sub, string][] = [['channel', 'Chaîne'], ['play', 'Partie'], ['fx', 'Effets'], ['bans', 'Exclus']];
+```
+
+Dans `init`, à côté de `let tab: Tab = 'game';` : `let sub: Sub = 'channel'; // sous-onglet des réglages, gardé à la réouverture`.
+
+Remplacer `settingsHtml` en entier. Tous les champs restent dans la page et seules les sections inactives sont masquées : `save()` continue de lire chaque champ.
+
+```ts
+  const settingsHtml = () => `
+    <nav class="menu-subtabs">${SUBS.map(([id, label]) => `<button data-sub="${id}">${label}</button>`).join('')}</nav>
+    <p class="menu-notice">${esc(notice)}</p>
+    <section data-group="channel">
+      <h3>Chaîne Twitch</h3>
+      <div class="menu-link">
+        <input name="channel" aria-label="Chaîne Twitch" value="${esc(params.channel ?? '')}" placeholder="ta_chaine" spellcheck="false" autocomplete="off">
+        <button data-act="connect">Connecter</button>
+      </div>
+      <p class="menu-conn" aria-live="polite"></p>
+      <h3>Lien pour OBS (sans menu)</h3>
+      <div class="menu-link">
+        <input name="link" readonly aria-label="Lien pour OBS (sans menu)" value="${esc(obsLink())}">
+        <button data-act="copy-link">Copier le lien</button>
+      </div>
+      <p class="menu-hint">La chaîne est enregistrée avec « Connecter » ou Entrée. Le lien est à coller dans une source navigateur OBS : le menu n'y apparaît pas. Il reprend tous les réglages.</p>
+    </section>
+    <section data-group="play">
+      <div class="menu-form">
+        <label>Durée d'une partie (min) <input name="duration" type="number" min="1" max="60" value="${params.duration}"></label>
+        <label>Billes en jeu (max) <input name="maxBalls" type="number" min="1" max="500" value="${params.maxBalls}"></label>
+        <label>Défilement des bacs <select name="binScroll">${[...new Set([0, 30, 60, params.binScroll])].map((s) => // valeur d'URL hors liste : affichée, sinon fermer le menu la remplacerait
+          `<option value="${s}"${s === params.binScroll ? ' selected' : ''}>${s === 0 ? 'Désactivé' : s % 60 === 0 ? `Toutes les ${s / 60} min` : `Toutes les ${s} s`}</option>`).join('')}</select></label>
+        <label class="menu-check"><input name="autoNext" type="checkbox"${params.autoNext ? ' checked' : ''}> Enchaîner les parties automatiquement</label>
+        <label class="menu-check"><input name="lane" type="checkbox"${params.lane ? ' checked' : ''}> Couloir mobile au-dessus des bacs</label>
+        <label class="menu-check"><input name="attract" type="checkbox"${params.attract ? ' checked' : ''}> Billes d'animation en attendant un joueur</label>
+      </div>
+      <div class="menu-actions">
+        <button data-act="apply-now">${APPLY_NOW}</button>
+        <button data-act="fullscreen">Plein écran</button>
+      </div>
+      <p class="menu-hint">Les changements sont enregistrés automatiquement. Durée, thème, couloir et enchaînement prennent effet à la partie suivante : « ${APPLY_NOW} » n'attend pas, mais coupe la partie en cours et ses scores sont perdus (deux clics pour confirmer).</p>
+    </section>
+    <section data-group="fx">
+      <div class="menu-form">
+        <label>Thème <select name="theme">${[...new Set(['auto', ...Object.keys(THEMES), params.theme])].map((id) => // id inconnu (URL, ancien réglage) : listé, sinon la liste retomberait sur « auto » et l'enregistrerait
+          `<option value="${esc(id)}"${id === params.theme ? ' selected' : ''}>${id === 'auto' ? 'Automatique (date)' : esc(id)}</option>`).join('')}</select></label>
+        <label class="menu-check"><input name="shake" type="checkbox"${params.shake ? ' checked' : ''}> Secousses de l'écran</label>
+        <label>Taquets spéciaux : un toutes les (s, 0 = aucun) <input name="specialEvery" type="number" min="0" max="300" value="${params.specialEvery}"></label>
+        ${EFFECTS.map((e) => `<label class="menu-check"><input name="fx-${e.id}" type="checkbox"${params.specialEffects.split(',').includes(e.id) ? ' checked' : ''}> ${esc(e.label)}</label>`).join('')}
+      </div>
+    </section>
+    <section data-group="bans">
+      <h3>Joueurs exclus</h3>
+      <div class="menu-live"></div>
+    </section>`;
+```
+
+Ajouter après `settingsHtml` :
+
+```ts
+  /** Sous-onglet des réglages : simple bascule de visibilité, sans re-rendu (les saisies en cours restent). */
+  function showSub() {
+    for (const s of body.querySelectorAll<HTMLElement>('[data-group]')) s.hidden = s.dataset.group !== sub;
+    for (const b of body.querySelectorAll<HTMLElement>('[data-sub]')) b.classList.toggle('active', b.dataset.sub === sub);
+  }
+```
+
+Dans `render()` : `body.innerHTML = tab === 'settings' ? settingsHtml() : tab === 'about' ? aboutHtml() : tab === 'players' ? …` (le reste inchangé), puis `showSub();` juste avant `refreshLive();`. `refreshLive` sort déjà tout seul quand il n'y a pas de `.menu-live` (onglet À propos).
+
+Gestionnaire `pointerdown` :
+
+```ts
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act],[data-tab],[data-sub]');
+    if (!el || el.matches(':disabled')) return;
+    save(); // le clic précède le `change` du champ en cours de saisie
+    if (el.dataset.sub) {
+      sub = el.dataset.sub as Sub;
+      showSub();
+    } else if (el.dataset.tab) {
+      tab = el.dataset.tab as Tab;
+      render();
+    } else act(el);
+```
+
+Premier lancement (fin de `init`) : ajouter `sub = 'channel';` à côté de `tab = 'settings';`.
+
+- [ ] **Step 3 : `src/ui/menu.css`** (après `.menu-close`)
+
+```css
+.menu-subtabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.menu-subtabs button { font-size: 18px; }
+.menu-subtabs button.active { background: var(--accent); color: var(--bg); }
+.menu-root a { color: var(--accent); }
+```
+
+- [ ] **Step 4 : `scripts/verify-streamer.mjs`**
+
+Playwright ne remplit pas un champ masqué : il faut choisir le sous-onglet avant. Ajouter après la définition de `gravityY` :
+
+```js
+const sub = (id) => page.click(`[data-sub=${id}]`); // sous-onglet des réglages
+```
+
+puis insérer :
+- avant `await page.focus('input[name=duration]'); // quitter le champ ne valide pas` : `await sub('play');` ;
+- avant `await page.fill('input[name=channel]', 'zz');` : `await sub('channel');` ;
+- avant `await page.uncheck('input[name=shake]');` : `await sub('fx');` ;
+- avant `await page.fill('input[name=duration]', '999');` : `await sub('play');` ;
+- avant la seconde `await page.fill('input[name=channel]', 'bad name');` (section 2, avant la fermeture) : `await sub('channel');`, puis avant la ligne suivante `await page.fill('input[name=duration]', '7');` : `await sub('play');` ;
+- avant la première `await page.click('[data-act=copy-link]');` : `await sub('channel');` ;
+- avant `await page.fill('input[name=duration]', '6');` : `await sub('play');` ;
+- section 2 bis', après `await page.click('[data-tab=settings]');` : `await sub('play');` ;
+- section 4, après `await page.click('[data-tab=settings]');` : `await sub('bans');` ;
+- section 5, avant `await page.fill('input[name=duration]', '1');` : `await sub('play');`.
+
+Et, juste avant `check('aucune erreur JS', …)` :
+
+```js
+// 9. À propos : version calculée au build, outils et dépôt
+page = await open('?debug=1');
+await page.keyboard.press('Escape');
+await page.click('[data-tab=about]');
+const about = await page.textContent('.menu-body');
+check('à propos : version, Phaser et lien GitHub', /v0\.1\.\d+/.test(about) && about.includes('Phaser 3.90')
+  && (await page.getAttribute('.menu-body a', 'href')) === 'https://github.com/moanatari/pachinko-twitch', about.trim().slice(0, 80));
+await page.close();
+```
+
+- [ ] **Step 5 : Vérifier**
+
+Run: `npm run build && npm run test` → vert.
+Run: `npm run verify` (dev server lancé) → tout OK, dont « à propos ».
+À la main : Échap → Réglages : quatre sous-onglets ; une saisie en cours dans « Partie » survit au passage par « Effets » ; fermer et rouvrir le menu garde le sous-onglet ; « À propos » affiche `v0.1.<n> · <commit> · <date> (dev)` et le lien ouvre GitHub dans un nouvel onglet.
+
+- [ ] **Step 6 :** `git add src scripts && git commit -m "feat: réglages en sous-onglets, onglet À propos (versions, dépôt)"`
+
+### Task 25.3 : PLAN et PR
+
+- [ ] Cocher l'étape 25 dans `PLAN.md`, commit, puis `git push -u origin feat/menu-a-propos && gh pr create --fill && gh pr checks --watch && gh pr merge --squash --delete-branch && git checkout main && git pull --ff-only`.
+- [ ] Après le déploiement, ouvrir la GitHub Page : « À propos » affiche la version sans « (dev) », avec un dernier chiffre égal au nombre de commits de `main`.

@@ -60,6 +60,7 @@ terminée et vérifiée.
 - [ ] 22. Couloir du bas (même spec, même plan)
 - [ ] 23. Bacs qui défilent (même spec, même plan)
 - [ ] 24. Billes d'animation pendant l'attente (même spec, même plan)
+- [ ] 25. Réglages en sous-onglets, onglet « À propos », version automatique (même plan)
 
 ## Décisions prises
 | Sujet | Choix |
@@ -722,6 +723,12 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
 ### 24. Billes d'animation
 - [ ] Réglage `attract` ; `src/scenes/attract.ts` : billes hors `GameState` pendant l'attente, figées puis éclatées à la première vraie bille.
 - [ ] **Vérif** : `npm run test` et `npm run verify` verts (classement vide, plafond, changement de thème) ; 60 fps.
+
+### 25. Réglages en sous-onglets, « À propos », version automatique
+- [ ] Version `majeur.mineur.<nombre de commits>` + commit + date, injectée au build (`vite.config.ts`, `__BUILD__`) ; `pages.yml` en `fetch-depth: 0`.
+- [ ] Réglages : sous-onglets Chaîne · Partie · Effets · Exclus (bascule de visibilité, enregistrement auto inchangé).
+- [ ] Onglet « À propos » : version, langages, technos et versions installées, lien vers le dépôt GitHub.
+- [ ] **Vérif** : `npm run test` et `npm run verify` verts ; version visible sur la GitHub Page après déploiement.
 
 ## Vérification
 - `npm run test` : `mapgen.test.ts` (1000 seeds × 5 patterns respectent les règles),
