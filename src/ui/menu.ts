@@ -190,6 +190,8 @@ function init(game: Phaser.Game, g: Game) {
       <label class="menu-check"><input name="lane" type="checkbox"${params.lane ? ' checked' : ''}> Couloir mobile au-dessus des bacs</label>
       <label>Taquets spéciaux : un toutes les (s, 0 = aucun) <input name="specialEvery" type="number" min="0" max="300" value="${params.specialEvery}"></label>
       ${EFFECTS.map((e) => `<label class="menu-check"><input name="fx-${e.id}" type="checkbox"${params.specialEffects.split(',').includes(e.id) ? ' checked' : ''}> ${esc(e.label)}</label>`).join('')}
+      <label>Défilement des bacs <select name="binScroll">${[...new Set([0, 30, 60, params.binScroll])].map((s) => // valeur d'URL hors liste : affichée, sinon fermer le menu la remplacerait
+        `<option value="${s}"${s === params.binScroll ? ' selected' : ''}>${s === 0 ? 'Désactivé' : s % 60 === 0 ? `Toutes les ${s / 60} min` : `Toutes les ${s} s`}</option>`).join('')}</select></label>
     </div>
     <div class="menu-actions">
       <button data-act="apply-now">${APPLY_NOW}</button>
@@ -255,6 +257,7 @@ function init(game: Phaser.Game, g: Game) {
       shake: field('shake').checked,
       autoNext: field('autoNext').checked,
       lane: field('lane').checked,
+      binScroll: field('binScroll').value,
       specialEvery: field('specialEvery').value, // champ vidé : valeur inchangée
       specialEffects: EFFECTS.filter((e) => field(`fx-${e.id}`).checked).map((e) => e.id).join(','),
     }, params);
