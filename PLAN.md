@@ -58,7 +58,7 @@ terminée et vérifiée.
 - [x] 20. Barres bumpers et hélices longues (même spec, même plan)
 - [x] 21. Éléments mobiles (même spec, même plan)
 - [x] 22. Couloir du bas (même spec, même plan)
-- [ ] 23. Bacs qui défilent (même spec, même plan)
+- [x] 23. Bacs qui défilent (même spec, même plan)
 - [ ] 24. Billes d'animation pendant l'attente (même spec, même plan)
 - [ ] 25. Réglages en sous-onglets, onglet « À propos », version automatique (même plan)
 
@@ -721,9 +721,10 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
       À valider à l'œil sur `dev` : balayage mur à mur, deux éléments en miroir en symétrique, case décochée.
 
 ### 23. Bacs qui défilent
-- [ ] Réglage `binScroll` (désactivé / 30 s / 1 min, URL 0–300) ; `binShifts` (jackpot jamais au bord).
-- [ ] `src/scenes/bins.ts` : glissement animé, valeurs payées tout de suite, figé en pause et au podium.
-- [ ] **Vérif** : `npm run test` et `npm run verify` verts (défilement, pause, `binScroll=45` conservé).
+- [x] Réglage `binScroll` (désactivé / 30 s / 1 min, URL 0–300) ; `binShifts` (jackpot jamais au bord).
+- [x] `src/scenes/bins.ts` : glissement animé, valeurs payées tout de suite, figé en pause et au podium.
+- [x] **Vérif** : `npm run test` (265) et `npm run verify` verts (défilement, pause, `binScroll=45` conservé), 158 fps headless.
+      À valider à l'œil sur `dev` : glissement de la bande et fondu aux bords.
 
 ### 24. Billes d'animation
 - [ ] Réglage `attract` ; `src/scenes/attract.ts` : billes hors `GameState` pendant l'attente, figées puis éclatées à la première vraie bille.
