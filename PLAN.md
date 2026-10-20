@@ -719,6 +719,8 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
 - ⚠️ « Rejouer cette carte » suit le réglage `lane` courant (l'historique ne garde que seed + motif).
 - [x] **Vérif** : `npm run test` (259) et `npm run verify` verts, 158 fps headless à 150 billes.
       À valider à l'œil sur `dev` : balayage mur à mur, deux éléments en miroir en symétrique, case décochée.
+- [x] Révision (2026-10-20, demande du streamer) : toujours deux éléments en miroir, un par moitié, sur toutes les
+      cartes ; seulement bumpers ou barres, plus d'hélice dans le couloir. `npm run test` (270) vert.
 
 ### 23. Bacs qui défilent
 - [x] Réglage `binScroll` (désactivé / 30 s / 1 min, URL 0–300) ; `binShifts` (jackpot jamais au bord).

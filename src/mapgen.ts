@@ -268,21 +268,19 @@ export function binShifts(points: readonly number[]): number[] {
   return Array.from({ length: n }, (_, k) => k).filter((k) => (j + k) % n !== 0 && (j + k) % n !== n - 1);
 }
 
-/** Couloir du bas : un élément en aller-retour de mur à mur juste au-dessus de la bande des bacs (deux en
- *  miroir en symétrique, un par moitié). La zone de jeu remonte au-dessus de lui. */
-function lane(g: Builder, symmetric: boolean) {
+/** Couloir du bas : deux bumpers ou deux barres en miroir, un par moitié, en aller-retour du mur au centre
+ *  juste au-dessus de la bande des bacs (jamais d'hélice). La zone de jeu remonte au-dessus d'eux. */
+function lane(g: Builder) {
   const { rng, b } = g;
-  const kind = rng.pick(['bumper', 'bar', 'spinner'] as const);
-  const r = kind === 'bumper' ? BUMPER_R : kind === 'bar' ? BAR_THICK / 2 : g.spinnerRadius(); // demi-hauteur
+  const kind = rng.pick(['bumper', 'bar'] as const);
+  const r = kind === 'bumper' ? BUMPER_R : BAR_THICK / 2; // demi-hauteur
   const half = kind === 'bar' ? LANE_BAR_LEN / 2 + r : r; // demi-largeur, bouts arrondis compris
   const y = g.m.binTop - BIN_CLEAR - r - 1;
   const x = b.left + MIN_GAP + half + 1;
-  const x2 = (symmetric ? g.cx - MIN_GAP / 2 : b.right - MIN_GAP) - half - 1;
+  const x2 = g.cx - MIN_GAP / 2 - half - 1;
   const move: Move = { x2, y2: y, periodMs: LANE_PERIOD_MS, phase: rng.next() };
-  const spec: Spec = kind === 'bumper' ? { kind, x, y, radius: r, move }
-    : kind === 'bar' ? { kind, x, y, length: LANE_BAR_LEN, angle: 0, move }
-      : { kind, x, y, radius: r, speed: g.spinnerSpeed(r), move };
-  if (symmetric ? g.place([spec, g.mirror(spec)]) : g.place([spec])) g.m.laneTop = y - r;
+  const spec: Spec = kind === 'bumper' ? { kind, x, y, radius: r, move } : { kind, x, y, length: LANE_BAR_LEN, angle: 0, move };
+  if (g.place([spec, g.mirror(spec)])) g.m.laneTop = y - r;
 }
 
 /** Déflecteurs collés aux murs, en quinconce : pas de couloir libre le long des bords. */
@@ -508,7 +506,7 @@ export function generateMap(seed: number, pattern?: PatternId, b: Bounds = BOARD
   };
   const g = new Builder(m, b, rng);
   const symmetric = p === 'symetrique';
-  if (opts.lane ?? true) lane(g, symmetric);
+  if (opts.lane ?? true) lane(g);
   wallGuides(g, symmetric);
   g.deferPegs();
   GENERATORS[p](g);

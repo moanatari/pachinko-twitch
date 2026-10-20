@@ -295,16 +295,23 @@ describe('couloir du bas', () => {
     }
   });
 
-  it('un élément (deux en miroir en symétrique), horizontal, mobile, lent', () => {
+  it('deux éléments en miroir sur toutes les cartes, bumpers ou barres (jamais d\'hélice), horizontaux, mobiles, lents', () => {
+    const mx = (x: number) => b.left + b.right - x;
     for (const pattern of PATTERNS) {
       for (let seed = 0; seed < 100; seed++) {
         const m = generateMap(seed, pattern), els = lane(m), at = `${pattern} ${seed}`;
-        expect(els.length, at).toBe(pattern === 'symetrique' ? 2 : 1);
+        expect(els.length, at).toBe(2);
+        expect(m.spinners.some((s) => s.y > m.laneTop!), at).toBe(false);
         for (const e of els) {
           expect(e.move, at).toBeDefined();
           expect(e.move!.y2, at).toBe(e.y);
           expect(e.move!.periodMs, at).toBe(LANE_PERIOD_MS);
         }
+        const [l, r] = [...els].sort((p, q) => p.x - q.x);
+        expect('length' in l, at).toBe('length' in r);
+        expect(Math.abs(r.x - mx(l.x)), at).toBeLessThan(0.5);
+        expect(Math.abs(r.move!.x2 - mx(l.move!.x2)), at).toBeLessThan(0.5);
+        expect(r.move!.phase, at).toBe(l.move!.phase);
       }
     }
   });
@@ -316,8 +323,8 @@ describe('couloir du bas', () => {
         for (const e of lane(m)) {
           const half = ('length' in e ? e.length / 2 + BAR_THICK / 2 : e.radius); // bouts arrondis compris
           const minX = Math.min(e.x, e.move!.x2) - half, maxX = Math.max(e.x, e.move!.x2) + half, cx = (b.left + b.right) / 2;
-          // en symétrique, chaque élément reste dans sa moitié, à MIN_GAP/2 du centre
-          const [lo, hi] = pattern === 'symetrique' && e.x > cx ? [cx + MIN_GAP / 2, b.right] : [b.left, pattern === 'symetrique' ? cx - MIN_GAP / 2 : b.right];
+          // chaque élément reste dans sa moitié, à MIN_GAP/2 du centre
+          const [lo, hi] = e.x > cx ? [cx + MIN_GAP / 2, b.right] : [b.left, cx - MIN_GAP / 2];
           expect(minX - lo, at).toBeGreaterThanOrEqual(lo === b.left ? MIN_GAP : 0);
           expect(hi - maxX, at).toBeGreaterThanOrEqual(hi === b.right ? MIN_GAP : 0);
         }
