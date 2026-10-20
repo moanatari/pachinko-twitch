@@ -52,7 +52,7 @@ interface El {
 interface SpinnerRt { body: Body; img: Phaser.GameObjects.Image; speed: number }
 /** Élément en aller-retour : corps et images déplacés ensemble. `pos` réutilisé : aucune allocation par pas. */
 interface MoverRt { body: Body; imgs: Phaser.GameObjects.Image[]; x: number; y: number; move: Move; t: number; pos: { x: number; y: number } }
-/** Taquet à moins de 10 points : repeint par la pluie d'or ; ceux à 1 point sont candidats aux taquets spéciaux. */
+/** Taquet sous PTS_PEG_GOLDEN : repeint par la pluie d'or ; ceux à 1 point sont candidats aux taquets spéciaux. */
 export interface PegRt { x: number; y: number; bodyId: number; img: Phaser.GameObjects.Image; value: PegValue }
 
 const DIVIDER = 6;
@@ -303,7 +303,7 @@ export class Game extends Phaser.Scene {
       if (p.value >= 10)
         this.halo(p.x, p.y, PEG_R * (p.value === 50 ? 9 : 5), p.value === 10 ? pal.pegGolden : p.value === 30 ? pal.bumperCore : pal.text);
       const img = this.track(this.add.image(p.x, p.y, PEG_TEX[p.value]).setDisplaySize(PEG_R * 2, PEG_R * 2));
-      if (p.value < 10) this.pegs.push({ x: p.x, y: p.y, bodyId: body.id, img, value: p.value });
+      if (p.value < PTS_PEG_GOLDEN) this.pegs.push({ x: p.x, y: p.y, bodyId: body.id, img, value: p.value });
       this.els.set(body.id, { kind: 'peg', points: p.value, pulse: { kind: 'peg', v: 0, img, size: PEG_R * 2 } });
     }
 
@@ -331,7 +331,7 @@ export class Game extends Phaser.Scene {
       const glow = this.track(this.add.image(r.x, r.y, 'fx-glow').setDisplaySize(r.length * 1.1, BAR_THICK * 3)
         .setRotation(r.angle).setBlendMode('ADD').setTint(hex(pal.bumperCore)).setAlpha(0));
       this.els.set(body.id, {
-        kind: 'bumper', points: PTS_BUMPER, half: r.length / 2,
+        kind: 'bumper', points: PTS_BUMPER, half: r.length / 2 - BAR_THICK / 2, // centre des bouts arrondis
         pulse: { kind: 'bumper', v: 0, img, size: r.length, h: BAR_THICK, glow },
       });
       this.mover(body, r, [img, glow]);
@@ -523,7 +523,7 @@ export class Game extends Phaser.Scene {
       const base = el.kind === 'peg' && this.specials.gold ? Math.max(PTS_PEG_GOLDEN, el.points) : el.points;
       const pts = ball.fake ? base : this.score(ball, base, x, y);
       if (!ball.fake) this.fx.popup(x, y, pts);
-      if (el.kind === 'peg') this.fx.peg(el.pulse, x, y, pts);
+      if (el.kind === 'peg') this.fx.peg(el.pulse, x, y, base); // étincelles selon la valeur du taquet, pas le multiplicateur
       else if (el.kind === 'bumper') this.fx.bumper(el.pulse, x, y, ball.fake);
       else this.fx.spinner(el.pulse, x, y);
     }

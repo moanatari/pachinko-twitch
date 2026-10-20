@@ -2,9 +2,9 @@
 import { Rng } from './rng';
 import {
   BOARD_W, HEIGHT, WALL, PEG_R, BUMPER_R, SPINNER_R, RAMP_THICK,
-  BAR_THICK, BAR_LEN_MIN, BAR_LEN_MAX, BAR_SHARE, SPINNER_R_LONG, SPINNER_LONG_SHARE, SPINNER_LONG_SPEED,
+  BAR_THICK, BAR_LEN_MIN, BAR_LEN_MAX, BAR_SHARE, BAR_ANGLE_MAX, SPINNER_R_LONG, SPINNER_LONG_SHARE, SPINNER_LONG_SPEED,
   SPAWN_ZONE, BIN_H, BIN_CLEAR, MIN_GAP, SPINNER_SPEED, PEG_VALUES, PEG_SHARE, RARE_PEG_SPACING,
-  MOVERS_MIN, MOVERS_MAX, MOVE_LEN_MIN, MOVE_LEN_MAX, MOVE_PERIOD_MIN, MOVE_PERIOD_MAX, LANE_BAR_LEN, LANE_PERIOD_MS,
+  MOVERS_MIN, MOVERS_MAX, MOVE_LEN_MIN, MOVE_LEN_MAX, MOVE_PERIOD_MIN, MOVE_PERIOD_MAX, MOVE_FLAT_SHARE, MOVE_ANGLE_FLAT, MOVE_ANGLE_MAX, LANE_BAR_LEN, LANE_PERIOD_MS,
 } from './config';
 
 export const PATTERNS = ['classique', 'symetrique', 'diagonale', 'trous', 'entonnoirs'] as const;
@@ -217,7 +217,7 @@ class Builder {
   /** Bumper rond ou, une fois sur trois, barre bumper. */
   bumperSpec(x: number, y: number): Spec {
     return this.rng.chance(BAR_SHARE)
-      ? { kind: 'bar', x, y, length: this.rng.range(BAR_LEN_MIN, BAR_LEN_MAX), angle: this.rng.range(-0.6, 0.6) }
+      ? { kind: 'bar', x, y, length: this.rng.range(BAR_LEN_MIN, BAR_LEN_MAX), angle: this.rng.range(-BAR_ANGLE_MAX, BAR_ANGLE_MAX) }
       : { kind: 'bumper', x, y, radius: BUMPER_R };
   }
 
@@ -268,21 +268,19 @@ export function binShifts(points: readonly number[]): number[] {
   return Array.from({ length: n }, (_, k) => k).filter((k) => (j + k) % n !== 0 && (j + k) % n !== n - 1);
 }
 
-/** Couloir du bas : un élément en aller-retour de mur à mur juste au-dessus de la bande des bacs (deux en
- *  miroir en symétrique, un par moitié). La zone de jeu remonte au-dessus de lui. */
-function lane(g: Builder, symmetric: boolean) {
+/** Couloir du bas : deux bumpers ou deux barres en miroir, un par moitié, en aller-retour du mur au centre
+ *  juste au-dessus de la bande des bacs (jamais d'hélice). La zone de jeu remonte au-dessus d'eux. */
+function lane(g: Builder) {
   const { rng, b } = g;
-  const kind = rng.pick(['bumper', 'bar', 'spinner'] as const);
-  const r = kind === 'bumper' ? BUMPER_R : kind === 'bar' ? BAR_THICK / 2 : g.spinnerRadius(); // demi-hauteur
+  const kind = rng.pick(['bumper', 'bar'] as const);
+  const r = kind === 'bumper' ? BUMPER_R : BAR_THICK / 2; // demi-hauteur
   const half = kind === 'bar' ? LANE_BAR_LEN / 2 + r : r; // demi-largeur, bouts arrondis compris
   const y = g.m.binTop - BIN_CLEAR - r - 1;
   const x = b.left + MIN_GAP + half + 1;
-  const x2 = (symmetric ? g.cx - MIN_GAP / 2 : b.right - MIN_GAP) - half - 1;
+  const x2 = g.cx - MIN_GAP / 2 - half - 1;
   const move: Move = { x2, y2: y, periodMs: LANE_PERIOD_MS, phase: rng.next() };
-  const spec: Spec = kind === 'bumper' ? { kind, x, y, radius: r, move }
-    : kind === 'bar' ? { kind, x, y, length: LANE_BAR_LEN, angle: 0, move }
-      : { kind, x, y, radius: r, speed: g.spinnerSpeed(r), move };
-  if (symmetric ? g.place([spec, g.mirror(spec)]) : g.place([spec])) g.m.laneTop = y - r;
+  const spec: Spec = kind === 'bumper' ? { kind, x, y, radius: r, move } : { kind, x, y, length: LANE_BAR_LEN, angle: 0, move };
+  if (g.place([spec, g.mirror(spec)])) g.m.laneTop = y - r;
 }
 
 /** Déflecteurs collés aux murs, en quinconce : pas de couloir libre le long des bords. */
@@ -327,7 +325,8 @@ function carveHoles(g: Builder, want: number, rMin: number, rMax: number, rects 
 }
 
 function ensureBumpers(g: Builder, n: number) {
-  for (let tries = 0; g.m.bumpers.length < n && tries < 100; tries++)
+  // le bumper du couloir (mobile) ne compte pas : il est sous la zone de jeu
+  for (let tries = 0; g.m.bumpers.filter((k) => !k.move).length < n && tries < 100; tries++)
     g.bumper(g.rng.range(g.b.left, g.b.right), g.rng.range(g.playTop, g.playBottom));
 }
 
@@ -379,7 +378,7 @@ function symetrique(g: Builder) {
 function diagonale(g: Builder) {
   const { rng } = g;
   const W = g.b.right - g.b.left;
-  const rampZone = (g.playBottom - g.playTop) * 0.7; // les rampes restent au-dessus d'une zone de taquets
+  const rampZone = (g.playBottom - g.playTop) * 0.6; // les rampes restent au-dessus d'une zone de taquets (réduite par le couloir)
   const n = rng.int(3, 5);
   for (let i = 0; i < n; i++) {
     const y = g.playTop + 60 + (i + 0.5) * ((rampZone - 60) / n);
@@ -443,7 +442,7 @@ function movers(g: Builder, symmetric: boolean) {
   const want = symmetric ? 2 * rng.int(MOVERS_MIN / 2, MOVERS_MAX / 2) : rng.int(MOVERS_MIN, MOVERS_MAX);
   for (let tries = 0, placed = 0; placed < want && tries < 600; tries++) {
     const len = rng.range(MOVE_LEN_MIN, MOVE_LEN_MAX);
-    const a = rng.chance(0.75) ? rng.range(-0.3, 0.3) : rng.range(-1.2, 1.2); // surtout horizontal
+    const a = rng.chance(MOVE_FLAT_SHARE) ? rng.range(-MOVE_ANGLE_FLAT, MOVE_ANGLE_FLAT) : rng.range(-MOVE_ANGLE_MAX, MOVE_ANGLE_MAX);
     const x = rng.range(b.left, symmetric ? g.cx : b.right), y = rng.range(g.playTop, g.playBottom);
     const move: Move = {
       x2: x + Math.cos(a) * len, y2: y + Math.sin(a) * len,
@@ -507,7 +506,7 @@ export function generateMap(seed: number, pattern?: PatternId, b: Bounds = BOARD
   };
   const g = new Builder(m, b, rng);
   const symmetric = p === 'symetrique';
-  if (opts.lane ?? true) lane(g, symmetric);
+  if (opts.lane ?? true) lane(g);
   wallGuides(g, symmetric);
   g.deferPegs();
   GENERATORS[p](g);

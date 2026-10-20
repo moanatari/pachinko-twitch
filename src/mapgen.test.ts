@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateMap, binShifts, validateMap, BOARD_BOUNDS, PATTERNS, type MapData, type Move } from './mapgen';
-import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK, BAR_THICK, SPINNER_R_LONG, PEG_SHARE, RARE_PEG_SPACING, MOVERS_MIN, MOVERS_MAX, MOVE_LEN_MIN, MOVE_LEN_MAX, MIN_GAP, LANE_PERIOD_MS } from './config';
+import { SPAWN_ZONE, BIN_H, BIN_CLEAR, RAMP_THICK, BAR_THICK, SPINNER_R_LONG, SPINNER_SPEED, SPINNER_LONG_SPEED, PEG_SHARE, RARE_PEG_SPACING, MOVERS_MIN, MOVERS_MAX, MOVE_LEN_MIN, MOVE_LEN_MAX, MIN_GAP, LANE_PERIOD_MS } from './config';
 
 const b = BOARD_BOUNDS;
 const binTop = b.bottom - BIN_H;
@@ -106,6 +106,23 @@ describe('generateMap', () => {
     const maps = Array.from({ length: 200 }, (_, s) => generateMap(s));
     expect(maps.some((m) => m.bars.length > 0)).toBe(true);
     expect(maps.some((m) => m.spinners.some((s) => s.radius === SPINNER_R_LONG))).toBe(true);
+  });
+
+  it('une hélice longue tourne moins vite qu\'une hélice normale', () => {
+    const spinners = Array.from({ length: 200 }, (_, s) => generateMap(s).spinners).flat();
+    for (const s of spinners) {
+      if (s.radius === SPINNER_R_LONG) expect(Math.abs(s.speed)).toBeLessThanOrEqual(SPINNER_SPEED * 1.3 * SPINNER_LONG_SPEED + 1e-9);
+      else expect(Math.abs(s.speed)).toBeGreaterThanOrEqual(SPINNER_SPEED * 0.7 - 1e-9);
+    }
+  });
+
+  it('au moins 2 bumpers fixes dans la zone de jeu (le bumper du couloir ne compte pas)', () => {
+    for (const pattern of ['classique', 'diagonale', 'trous', 'entonnoirs'] as const) {
+      for (let seed = 0; seed < 100; seed++) {
+        const m = generateMap(seed, pattern);
+        expect(m.bumpers.filter((k) => !k.move).length, `${pattern} ${seed}`).toBeGreaterThanOrEqual(2);
+      }
+    }
   });
   it('même seed → carte identique', () => expect(generateMap(123)).toEqual(generateMap(123)));
 
@@ -278,16 +295,23 @@ describe('couloir du bas', () => {
     }
   });
 
-  it('un élément (deux en miroir en symétrique), horizontal, mobile, lent', () => {
+  it('deux éléments en miroir sur toutes les cartes, bumpers ou barres (jamais d\'hélice), horizontaux, mobiles, lents', () => {
+    const mx = (x: number) => b.left + b.right - x;
     for (const pattern of PATTERNS) {
       for (let seed = 0; seed < 100; seed++) {
         const m = generateMap(seed, pattern), els = lane(m), at = `${pattern} ${seed}`;
-        expect(els.length, at).toBe(pattern === 'symetrique' ? 2 : 1);
+        expect(els.length, at).toBe(2);
+        expect(m.spinners.some((s) => s.y > m.laneTop!), at).toBe(false);
         for (const e of els) {
           expect(e.move, at).toBeDefined();
           expect(e.move!.y2, at).toBe(e.y);
           expect(e.move!.periodMs, at).toBe(LANE_PERIOD_MS);
         }
+        const [l, r] = [...els].sort((p, q) => p.x - q.x);
+        expect('length' in l, at).toBe('length' in r);
+        expect(Math.abs(r.x - mx(l.x)), at).toBeLessThan(0.5);
+        expect(Math.abs(r.move!.x2 - mx(l.move!.x2)), at).toBeLessThan(0.5);
+        expect(r.move!.phase, at).toBe(l.move!.phase);
       }
     }
   });
@@ -299,8 +323,8 @@ describe('couloir du bas', () => {
         for (const e of lane(m)) {
           const half = ('length' in e ? e.length / 2 + BAR_THICK / 2 : e.radius); // bouts arrondis compris
           const minX = Math.min(e.x, e.move!.x2) - half, maxX = Math.max(e.x, e.move!.x2) + half, cx = (b.left + b.right) / 2;
-          // en symétrique, chaque élément reste dans sa moitié, à MIN_GAP/2 du centre
-          const [lo, hi] = pattern === 'symetrique' && e.x > cx ? [cx + MIN_GAP / 2, b.right] : [b.left, pattern === 'symetrique' ? cx - MIN_GAP / 2 : b.right];
+          // chaque élément reste dans sa moitié, à MIN_GAP/2 du centre
+          const [lo, hi] = e.x > cx ? [cx + MIN_GAP / 2, b.right] : [b.left, cx - MIN_GAP / 2];
           expect(minX - lo, at).toBeGreaterThanOrEqual(lo === b.left ? MIN_GAP : 0);
           expect(hi - maxX, at).toBeGreaterThanOrEqual(hi === b.right ? MIN_GAP : 0);
         }
@@ -314,6 +338,9 @@ describe('couloir du bas', () => {
         const m = generateMap(seed, pattern);
         for (const p of m.pegs) expect(p.y, `${pattern} ${seed}`).toBeLessThan(m.laneTop!);
         for (const r of m.ramps) expect(r.y, `${pattern} ${seed}`).toBeLessThan(m.laneTop!);
+        // hors couloir, ni l'élément ni le bout de son trajet ne descendent dans la bande
+        for (const e of [...m.bumpers, ...m.bars, ...m.spinners].filter((e) => e.y < m.laneTop!))
+          expect(Math.max(e.y, e.move?.y2 ?? e.y), `${pattern} ${seed}`).toBeLessThan(m.laneTop!);
       }
     }
   });

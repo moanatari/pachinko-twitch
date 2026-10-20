@@ -719,6 +719,8 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
 - ⚠️ « Rejouer cette carte » suit le réglage `lane` courant (l'historique ne garde que seed + motif).
 - [x] **Vérif** : `npm run test` (259) et `npm run verify` verts, 158 fps headless à 150 billes.
       À valider à l'œil sur `dev` : balayage mur à mur, deux éléments en miroir en symétrique, case décochée.
+- [x] Révision (2026-10-20, demande du streamer) : toujours deux éléments en miroir, un par moitié, sur toutes les
+      cartes ; seulement bumpers ou barres, plus d'hélice dans le couloir. `npm run test` (270) vert.
 
 ### 23. Bacs qui défilent
 - [x] Réglage `binScroll` (désactivé / 30 s / 1 min, URL 0–300) ; `binShifts` (jackpot jamais au bord).
@@ -736,7 +738,7 @@ d'une chaîne à moitié tapée (ses modos pouvaient alors lancer `!pachinko end
 - [x] Réglages : sous-onglets Chaîne · Partie · Effets · Exclus (bascule de visibilité, enregistrement auto inchangé).
 - [x] Onglet « À propos » : version, langages, technos et versions installées, lien vers le dépôt GitHub.
 - [x] **Vérif** : `npm run test` (268) et `npm run verify` verts ; version `v0.1.53` dans le bundle.
-- [ ] Après la mise en production : « À propos » de la GitHub Page affiche la version sans « (dev) », dernier chiffre = nombre de commits de `main`.
+- [x] Après la mise en production : « À propos » de la GitHub Page affiche la version sans « (dev) », dernier chiffre = nombre de commits de `main` (`v0.1.55`, 770f727).
 
 ## Vérification
 - `npm run test` : `mapgen.test.ts` (1000 seeds × 5 patterns respectent les règles),
